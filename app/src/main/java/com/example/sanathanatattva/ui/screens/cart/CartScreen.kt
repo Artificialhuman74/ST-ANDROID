@@ -1,0 +1,283 @@
+package com.example.sanathanatattva.ui.screens.cart
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.sanathanatattva.data.cart.CartLine
+import com.example.sanathanatattva.data.cart.totals
+import com.example.sanathanatattva.imageUrl
+import com.example.sanathanatattva.ui.appContainer
+import com.example.sanathanatattva.ui.components.EmptyState
+import com.example.sanathanatattva.ui.navigation.Routes
+import com.example.sanathanatattva.ui.session.SessionViewModel
+import com.example.sanathanatattva.util.formatRupees
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CartScreen(navController: NavController, session: SessionViewModel) {
+    val container = appContainer()
+    val vm: CartViewModel = viewModel { CartViewModel(container) }
+    val lines by vm.lines.collectAsState()
+    val caps by vm.refillCaps.collectAsState()
+    val isLoggedIn by session.isLoggedIn.collectAsState()
+
+    val totals = lines.totals()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Your cart") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            if (lines.isNotEmpty()) {
+                Surface(shadowElevation = 8.dp) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row {
+                            Text("To pay", style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                formatRupees(totals.payable),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                        if (totals.depositTotal > 0) {
+                            Text(
+                                "includes ${formatRupees(totals.depositTotal)} in refundable container deposits",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.tertiary,
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                if (isLoggedIn == true) navController.navigate(Routes.CHECKOUT)
+                                else navController.navigate(Routes.LOGIN)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                        ) {
+                            Text(if (isLoggedIn == true) "Go to checkout" else "Log in to checkout")
+                        }
+                    }
+                }
+            }
+        },
+    ) { padding ->
+        if (lines.isEmpty()) {
+            Column(Modifier.padding(padding)) {
+                EmptyState(
+                    icon = Icons.Outlined.ShoppingCart,
+                    title = "Your cart is empty",
+                    body = "Buy oil in a returnable container and pay a small deposit, " +
+                        "or refill a container you already hold and skip the deposit.",
+                    actionLabel = "Browse the shop",
+                    onAction = { navController.popBackStack(Routes.SHOP, inclusive = false) },
+                )
+            }
+        } else {
+            LazyColumn(
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(padding),
+            ) {
+                items(lines, key = { "${it.productId}-${it.isRefill}" }) { line ->
+                    CartLineCard(
+                        line = line,
+                        heldForProduct = caps[line.productId] ?: 0,
+                        refillInCart = lines
+                            .filter { it.productId == line.productId && it.isRefill }
+                            .sumOf { it.quantity },
+                        isLoggedIn = isLoggedIn == true,
+                        onQuantity = { vm.setQuantity(line, it) },
+                        onRefillChange = { vm.setRefill(line, it) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CartLineCard(
+    line: CartLine,
+    heldForProduct: Int,
+    refillInCart: Int,
+    isLoggedIn: Boolean,
+    onQuantity: (Int) -> Unit,
+    onRefillChange: (Boolean) -> Unit,
+) {
+    val hasContainer = line.containerType != null && line.containerCost > 0
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        ),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val context = LocalContext.current
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(imageUrl(line.imageUrl))
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = line.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(10.dp)),
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(line.name, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "${formatRupees(line.price)} per ${line.unit}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                // Quantity stepper
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FilledIconButton(
+                        onClick = { onQuantity(line.quantity - 1) },
+                        modifier = Modifier.size(36.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    ) {
+                        Icon(Icons.Filled.Remove, contentDescription = "Reduce quantity")
+                    }
+                    Text(
+                        "${line.quantity}",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    FilledIconButton(
+                        onClick = { onQuantity(line.quantity + 1) },
+                        modifier = Modifier.size(36.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Increase quantity")
+                    }
+                }
+            }
+
+            if (hasContainer && isLoggedIn && heldForProduct > 0) {
+                Spacer(Modifier.height(10.dp))
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = line.isRefill,
+                        onClick = { onRefillChange(true) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) { Text("Refill (no deposit)") }
+                    SegmentedButton(
+                        selected = !line.isRefill,
+                        onClick = { onRefillChange(false) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) { Text("Buy container") }
+                }
+            }
+
+            when {
+                line.isRefill && refillInCart > heldForProduct -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "You hold $heldForProduct container(s) of this oil, but the cart has " +
+                            "$refillInCart refills. Reduce the refill quantity or switch the rest to Buy.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                !line.isRefill && hasContainer -> {
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    Row {
+                        Text(
+                            "Container deposit (${line.containerType})",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            formatRupees(line.containerCost * line.quantity),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
+                    Text(
+                        "Refunded when you return the container.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                line.isRefill -> {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Refill: uses a container you already hold. No deposit.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        }
+    }
+}

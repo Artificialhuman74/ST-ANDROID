@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-08T00:00:00Z",
+  "title": "Design System: Sanathana Tattva",
+  "extensions": {
+    "colorMeta": {
+      "brand-green": { "role": "primary", "displayName": "Brand Green", "canonical": "#1A6B2E", "tonalRamp": ["#092510", "#14532D", "#1A6B2E", "#2E8546", "#5AAB6F", "#8FD6A4", "#B9E6C6", "#D9ECE0"] },
+      "sage": { "role": "secondary", "displayName": "Sage", "canonical": "#506352", "tonalRamp": ["#0E1F13", "#2A3A2E", "#506352", "#6B7F6E", "#8A9C8D", "#AEBFB1", "#D4E8D9", "#E9F3EC"] },
+      "ledger-gold": { "role": "tertiary", "displayName": "Ledger Gold", "canonical": "#885C24", "tonalRamp": ["#2E1A05", "#4E2E0F", "#6B4519", "#885C24", "#A97E42", "#C9A46E", "#E5CCA0", "#F8EDCC"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1A1C1A", "tonalRamp": ["#1A1C1A", "#404943", "#5C665F", "#707973", "#9AA39C", "#C0C9C1", "#E0E4DC", "#F9FAF6"] },
+      "mist": { "role": "neutral", "displayName": "Mist", "canonical": "#F9FAF6", "tonalRamp": ["#E1E5DF", "#E7EAE4", "#EDF0EA", "#F3F5F0", "#F9FAF6", "#FDFDFA", "#FFFFFF", "#FFFFFF"] },
+      "error-red": { "role": "error", "displayName": "Error Red", "canonical": "#BA1A1A", "tonalRamp": ["#410002", "#690005", "#93000A", "#BA1A1A", "#DE3730", "#FF897D", "#FFDAD6", "#FFF8F7"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Screen titles." },
+      "title": { "displayName": "Title", "purpose": "Section heads within a screen." },
+      "body": { "displayName": "Body", "purpose": "All primary reading text. Hard 16sp floor for purchase-critical content." },
+      "label": { "displayName": "Label", "purpose": "Buttons, form labels, chips." }
+    },
+    "shadows": [
+      { "name": "resting-card", "value": "0 1px 2px rgba(26,28,26,0.10)", "purpose": "Near-invisible lift on product cards (1dp); tonal color does the real separation." },
+      { "name": "floating-bar", "value": "0 -2px 12px rgba(26,28,26,0.16)", "purpose": "Sticky checkout/cart bars floating over scrolling content (8dp). The only pronounced shadow." }
+    ],
+    "motion": [
+      { "name": "skeleton-pulse", "value": "700ms linear alternate infinite (alpha 0.45→1)", "purpose": "Loading skeleton pulse." },
+      { "name": "state-standard", "value": "cubic-bezier(0.2, 0, 0, 1) 200ms", "purpose": "Material 3 standard easing for state transitions; motion conveys state, never decoration." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action per screen. Brand green pill, white label.",
+      "html": "<button class=\"ds-btn-primary\">Add to cart</button>",
+      "css": ".ds-btn-primary { background: #1A6B2E; color: #fff; font-family: Roboto, sans-serif; font-size: 14px; font-weight: 500; letter-spacing: 0.1px; padding: 12px 24px; border: none; border-radius: 999px; min-height: 48px; cursor: pointer; transition: background 150ms cubic-bezier(0.2,0,0,1); } .ds-btn-primary:hover { background: #14532D; } .ds-btn-primary:focus-visible { outline: 2px solid #1A6B2E; outline-offset: 2px; } .ds-btn-primary:disabled { background: rgba(26,28,26,0.12); color: rgba(26,28,26,0.38); }"
+    },
+    {
+      "name": "Product Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Resting card on the shelf: bright surface, 16dp corners, 1dp lift.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-img\"></div><div class=\"ds-card-title\">Cold-Pressed Groundnut Oil</div><div class=\"ds-card-meta\">1 L · glass bottle</div><div class=\"ds-card-price\">₹380</div></div>",
+      "css": ".ds-card { background: #FDFDFA; border-radius: 16px; padding: 16px; box-shadow: 0 1px 2px rgba(26,28,26,0.10); font-family: Roboto, sans-serif; width: 220px; } .ds-card-img { background: #E7EAE4; border-radius: 12px; height: 120px; margin-bottom: 12px; } .ds-card-title { color: #1A1C1A; font-size: 16px; font-weight: 600; line-height: 24px; } .ds-card-meta { color: #404943; font-size: 14px; line-height: 20px; } .ds-card-price { color: #1A1C1A; font-size: 16px; font-weight: 600; margin-top: 8px; }"
+    },
+    {
+      "name": "Money Panel",
+      "kind": "custom",
+      "refersTo": "money-panel",
+      "description": "Gold container used exclusively for money: wallet, deposits, cashback.",
+      "html": "<div class=\"ds-money\"><span class=\"ds-money-label\">Container deposit</span><span class=\"ds-money-amount\">₹50</span></div>",
+      "css": ".ds-money { background: #F8EDCC; color: #4E2E0F; border-radius: 12px; padding: 16px; display: flex; justify-content: space-between; align-items: center; font-family: Roboto, sans-serif; width: 280px; } .ds-money-label { font-size: 16px; line-height: 24px; } .ds-money-amount { font-size: 16px; font-weight: 600; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "card",
+      "description": "Tinted badge for order/container status; text always accompanies color.",
+      "html": "<span class=\"ds-chip\">Delivered</span>",
+      "css": ".ds-chip { background: #D9ECE0; color: #092510; border-radius: 8px; padding: 4px 10px; font-family: Roboto, sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0.4px; display: inline-block; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "card",
+      "description": "M3 outlined field: green-grey stroke, brand-green focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Delivery address\" />",
+      "css": ".ds-input { background: #FDFDFA; color: #1A1C1A; border: 1px solid #707973; border-radius: 8px; padding: 14px 16px; font-family: Roboto, sans-serif; font-size: 16px; line-height: 24px; width: 280px; min-height: 48px; box-sizing: border-box; } .ds-input::placeholder { color: #404943; } .ds-input:focus { outline: none; border: 2px solid #1A6B2E; padding: 13px 15px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Specialty Storefront",
+    "overview": "A calm, curated shop — not a marketplace. Few products per view, imagery leads, and the shelf never shouts. A light-only, green-tinted world where hierarchy comes from type weight and tonal surfaces, never from noise. Every screen behaves like a well-kept storefront: the goods are the color, the chrome recedes, and money is the one thing the interface is never casual about.",
+    "keyCharacteristics": [
+      "Light-only theme on a green-tinted near-white (mist), designed for bright ambient light",
+      "Restrained color strategy: brand green ≤10% of any screen, on actions and selection only",
+      "Gold appears exclusively at money moments — wallet, deposits, cashback, discounts",
+      "One type family (Roboto), weight-driven hierarchy, 16sp body floor",
+      "Depth is tonal; shadows are earned by floating surfaces only"
+    ],
+    "rules": [
+      { "name": "The Gold-Means-Money Rule", "body": "Ledger Gold is forbidden anywhere money is not being shown. If gold appears on screen, the user is looking at rupees. No decorative gold, ever.", "section": "colors" },
+      { "name": "The Quiet Shelf Rule", "body": "Brand green covers at most ~10% of any screen. It marks the action and the selection; everything else is neutral.", "section": "colors" },
+      { "name": "The 16sp Floor Rule", "body": "Anything the user must read to complete a purchase renders at ≥16sp. All sizes in sp; layouts must survive 1.3× system font scale.", "section": "typography" },
+      { "name": "The Earned Shadow Rule", "body": "A shadow above 1dp requires the surface to float over other content. Static cards never get bigger shadows to pop; step the container tone instead.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do reserve Ledger Gold exclusively for money: wallet, deposits, cashback, discounts.",
+      "Do keep brand green to the action and the selection — ≤10% of any screen.",
+      "Do label every rupee on screen: product price vs. deposit vs. wallet credit vs. cashback.",
+      "Do use skeleton blocks for loading, teaching empty states, and fix-naming error states on every screen.",
+      "Do keep all text in sp, body ≥16sp, touch targets ≥48dp, and verify 4.5:1 contrast.",
+      "Do use standard Material 3 controls; earned familiarity over novelty."
+    ],
+    "donts": [
+      "Don't build cold-marketplace density — badge clutter, cramped listings, promo noise.",
+      "Don't use urgency mechanics: countdown timers, \"only 2 left!\", flashing promos.",
+      "Don't add eco-cliché decoration: leaf icons, kraft textures, greenwashing copy.",
+      "Don't put gold on anything that isn't money, or use color as the only signal.",
+      "Don't give resting cards shadows above 1dp, nest cards, or invent non-standard controls.",
+      "Don't introduce a second type family or a dark theme."
+    ]
+  }
+}

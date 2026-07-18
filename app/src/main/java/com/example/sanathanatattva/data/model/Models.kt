@@ -29,6 +29,20 @@ data class ResendVerificationRequest(val email: String)
 @Serializable
 data class LoginRequest(val email: String, val password: String)
 
+/**
+ * Passwordless email login: request a one-time code.
+ * Contract: POST api/auth/consumer/email/send-otp — backend pending.
+ */
+@Serializable
+data class SendEmailOtpRequest(val email: String)
+
+@Serializable
+data class SendEmailOtpResponse(
+    val success: Boolean = false,
+    val message: String? = null,
+    val dev_otp: String? = null,
+)
+
 @Serializable
 data class AuthResponse(
     val success: Boolean = true,

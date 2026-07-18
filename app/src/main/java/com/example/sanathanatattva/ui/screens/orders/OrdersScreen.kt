@@ -33,6 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.sanathanatattva.data.model.Order
 import com.example.sanathanatattva.ui.appContainer
+import com.example.sanathanatattva.ui.components.DockContentClearance
 import com.example.sanathanatattva.ui.components.EmptyState
 import com.example.sanathanatattva.ui.components.ErrorState
 import com.example.sanathanatattva.ui.components.SkeletonBlock
@@ -106,7 +107,10 @@ fun OrdersScreen(navController: NavController, session: SessionViewModel) {
                 modifier = Modifier.padding(padding),
             ) {
                 LazyColumn(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 16.dp, end = 16.dp, top = 16.dp,
+                        bottom = 16.dp + DockContentClearance,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {

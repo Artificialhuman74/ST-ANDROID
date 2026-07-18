@@ -17,6 +17,9 @@ datastore = "1.1.7"
 razorpay = "1.6.41"
 credentialsVersion = "1.5.0"
 googleIdVersion = "1.1.1"
+firebaseBom = "34.1.0"
+googleServices = "4.4.3"
+kotlinxCoroutines = "1.10.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -47,9 +50,13 @@ razorpay-checkout = { group = "com.razorpay", name = "checkout", version.ref = "
 credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentialsVersion" }
 credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentialsVersion" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleIdVersion" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutines" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 

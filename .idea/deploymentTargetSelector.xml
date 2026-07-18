@@ -2,7 +2,7 @@
 <project version="4">
   <component name="deploymentTargetSelector">
     <selectionStates>
-      <SelectionState runConfigName="app">
+      <SelectionState runConfigName="MainActivity">
         <option name="selectionMode" value="DROPDOWN" />
         <DropdownSelection timestamp="2026-07-08T13:06:21.834037Z">
           <Target type="DEFAULT_BOOT">
@@ -13,7 +13,7 @@
         </DropdownSelection>
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="MainActivity">
+      <SelectionState runConfigName="Sanathana Tattva">
         <option name="selectionMode" value="DROPDOWN" />
         <DropdownSelection timestamp="2026-07-08T13:06:21.834037Z">
           <Target type="DEFAULT_BOOT">

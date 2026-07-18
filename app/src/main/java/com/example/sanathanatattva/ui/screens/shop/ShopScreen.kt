@@ -1,6 +1,7 @@
 package com.example.sanathanatattva.ui.screens.shop
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
@@ -9,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ProductionQuantityLimits
 import androidx.compose.material.icons.outlined.ShoppingCart
@@ -45,6 +49,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -54,10 +62,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -70,12 +80,16 @@ import com.example.sanathanatattva.data.cart.totals
 import com.example.sanathanatattva.data.model.Product
 import com.example.sanathanatattva.imageUrl
 import com.example.sanathanatattva.ui.appContainer
+import com.example.sanathanatattva.ui.components.DockContentClearance
 import com.example.sanathanatattva.ui.components.EmptyState
 import com.example.sanathanatattva.ui.components.ErrorState
 import com.example.sanathanatattva.ui.components.SkeletonBlock
+import com.example.sanathanatattva.ui.components.rememberReducedMotion
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
 import com.example.sanathanatattva.util.formatRupees
+import java.util.Calendar
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,8 +99,36 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
     val state by vm.state.collectAsState()
     val cartLines by vm.cartLines.collectAsState()
     val isLoggedIn by session.isLoggedIn.collectAsState()
+    val consumer by session.consumer.collectAsState()
+    val reducedMotion = rememberReducedMotion()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     val totals = cartLines.totals()
+
+    // A warm, time-aware greeting — personalised when we know who's shopping.
+    val greeting = remember(consumer?.name) {
+        val firstName = consumer?.name?.trim()?.takeIf { it.isNotEmpty() }?.substringBefore(' ')
+        val part = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+            in 5..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            in 17..22 -> "Good evening"
+            // Late-night wink for a cold-pressed *oil* shop.
+            else -> return@remember "Burning the midnight oil?"
+        }
+        if (firstName != null) "$part, $firstName" else part
+    }
+
+    // The cart icon gives a quick pop each time an item lands in it.
+    val cartPop = remember { Animatable(1f) }
+    var lastCount by remember { mutableStateOf(totals.itemCount) }
+    LaunchedEffect(totals.itemCount) {
+        if (totals.itemCount > lastCount && !reducedMotion) {
+            cartPop.snapTo(1.3f)
+            cartPop.animateTo(1f, tween(400, easing = FastOutSlowInEasing))
+        }
+        lastCount = totals.itemCount
+    }
 
     var playedEntrance by remember { mutableStateOf(false) }
     LaunchedEffect(state.products.isNotEmpty()) {
@@ -104,6 +146,10 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                 actions = {
                     IconButton(onClick = { navController.navigate(Routes.CART) }) {
                         BadgedBox(
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = cartPop.value
+                                scaleY = cartPop.value
+                            },
                             badge = {
                                 if (totals.itemCount > 0) Badge { Text("${totals.itemCount}") }
                             }
@@ -114,27 +160,24 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                 },
             )
         },
-        bottomBar = {
-            AnimatedVisibility(
-                visible = totals.itemCount > 0,
-                enter = slideInVertically(
-                    animationSpec = tween(320, easing = FastOutSlowInEasing),
-                    initialOffsetY = { it },
-                ) + fadeIn(tween(220)),
-                exit = slideOutVertically(
-                    animationSpec = tween(200, easing = FastOutLinearInEasing),
-                    targetOffsetY = { it },
-                ) + fadeOut(tween(140)),
-            ) {
-                CartBar(
-                    itemCount = totals.itemCount,
-                    amount = totals.payable,
-                    onClick = { navController.navigate(Routes.CART) },
-                )
-            }
-        },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        // The bottom navigation dock floats over this content (see AppRoot), so the
+        // list scrolls behind it and the cart bar is overlaid just above it.
+        Box(Modifier.padding(padding).fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+
+            Text(
+                greeting,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
+            )
+            Text(
+                "Cold-pressed oils, kept in steel.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
+            )
 
             OutlinedTextField(
                 value = state.search,
@@ -142,6 +185,7 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                 placeholder = { Text("Search oils, ghee…") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 singleLine = true,
+                shape = RoundedCornerShape(28.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { vm.submitSearch() }),
                 modifier = Modifier
@@ -195,7 +239,12 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
 
                 else -> LazyColumn(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp,
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 4.dp,
+                        // Clear the floating dock, plus the cart bar when it's showing.
+                        bottom = 16.dp + DockContentClearance +
+                            if (totals.itemCount > 0) 72.dp else 0.dp,
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -219,19 +268,87 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                                 product = product,
                                 heldCount = state.refillCaps[product.id] ?: 0,
                                 refillRemaining = vm.refillRemaining(product.id),
-                                inCartCount = cartLines
-                                    .filter { it.productId == product.id }
+                                buyInCart = cartLines
+                                    .filter { it.productId == product.id && !it.isRefill }
+                                    .sumOf { it.quantity },
+                                refillInCart = cartLines
+                                    .filter { it.productId == product.id && it.isRefill }
                                     .sumOf { it.quantity },
                                 isLoggedIn = isLoggedIn == true,
                                 onOpen = { navController.navigate(Routes.product(product.id)) },
-                                onAdd = { refill -> vm.addToCart(product, refill) },
+                                onRemove = { refill -> vm.removeFromCart(product.id, refill) },
+                                onAdd = { refill ->
+                                    vm.addToCart(product, refill)
+                                    // Refill reuses a held container — celebrate the
+                                    // deposit the customer just kept (gold = money).
+                                    val deposit = product.container_cost
+                                    if (refill && deposit != null && deposit > 0.0) {
+                                        scope.launch {
+                                            snackbarHostState.currentSnackbarData?.dismiss()
+                                            snackbarHostState.showSnackbar(
+                                                message = refillSavingMessage(deposit),
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                        }
+                                    }
+                                },
                             )
                         }
                     }
                 }
             }
         }
+
+            AnimatedVisibility(
+                visible = totals.itemCount > 0,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    // Sit just above the floating dock rather than well clear of it.
+                    .padding(bottom = DockContentClearance - 16.dp),
+                enter = slideInVertically(
+                    animationSpec = tween(320, easing = FastOutSlowInEasing),
+                    initialOffsetY = { it },
+                ) + fadeIn(tween(220)),
+                exit = slideOutVertically(
+                    animationSpec = tween(200, easing = FastOutLinearInEasing),
+                    targetOffsetY = { it },
+                ) + fadeOut(tween(140)),
+            ) {
+                CartBar(
+                    itemCount = totals.itemCount,
+                    amount = totals.payable,
+                    onClick = { navController.navigate(Routes.CART) },
+                )
+            }
+
+            // Gold "deposit saved" note on refill — sits above the cart bar + dock.
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = DockContentClearance + if (totals.itemCount > 0) 84.dp else 8.dp)
+                    .padding(horizontal = 16.dp),
+            ) { data ->
+                Snackbar(
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                ) {
+                    Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
     }
+}
+
+/** Warm, varied confirmations for the deposit a refill just saved. */
+private fun refillSavingMessage(deposit: Double): String {
+    val templates = listOf(
+        "Reusing your container — %s deposit stays with you.",
+        "No new deposit. Your %s keeps working for you.",
+        "Refill added — you kept your %s deposit.",
+    )
+    return templates.random().format(formatRupees(deposit))
 }
 
 @Composable
@@ -239,52 +356,64 @@ private fun ProductCard(
     product: Product,
     heldCount: Int,
     refillRemaining: Int,
-    inCartCount: Int,
+    buyInCart: Int,
+    refillInCart: Int,
     isLoggedIn: Boolean,
     onOpen: () -> Unit,
     onAdd: (isRefill: Boolean) -> Unit,
+    onRemove: (isRefill: Boolean) -> Unit,
 ) {
     val outOfStock = product.stock <= 0
     val context = LocalContext.current
 
     Card(
         onClick = onOpen,
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Row(Modifier.padding(12.dp)) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(imageUrl(product.image_url))
-                    .crossfade(true)
-                    .build(),
-                contentDescription = product.name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(12.dp)),
-            )
-            Spacer(Modifier.width(12.dp))
+            Box(
+                Modifier
+                    .size(112.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(imageUrl(product.image_url))
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = product.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                )
+            }
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(product.name, style = MaterialTheme.typography.titleMedium)
                 Text(
                     "per ${product.unit}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         formatRupees(product.price),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         "incl. GST",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 2.dp),
                     )
                 }
                 val deposit = product.container_cost
@@ -317,22 +446,91 @@ private fun ProductCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
 
-                    refillRemaining > 0 -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { onAdd(true) }) { Text("Refill") }
-                        FilledTonalButton(onClick = { onAdd(false) }) { Text("Buy") }
+                    // Refill available (or already in the cart): a control for each of
+                    // refill and buy, each swapping to a stepper once it holds items.
+                    refillRemaining > 0 || refillInCart > 0 -> Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        AddOrStepper(
+                            label = "Refill",
+                            count = refillInCart,
+                            canIncrement = refillRemaining > 0,
+                            onIncrement = { onAdd(true) },
+                            onDecrement = { onRemove(true) },
+                        )
+                        AddOrStepper(
+                            label = "Buy",
+                            count = buyInCart,
+                            tonal = true,
+                            onIncrement = { onAdd(false) },
+                            onDecrement = { onRemove(false) },
+                        )
                     }
 
-                    else -> Button(onClick = { onAdd(false) }) { Text("Add") }
-                }
-
-                if (inCartCount > 0) {
-                    Text(
-                        "$inCartCount in cart",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
+                    else -> AddOrStepper(
+                        label = "Add",
+                        count = buyInCart,
+                        onIncrement = { onAdd(false) },
+                        onDecrement = { onRemove(false) },
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Shows an add button until the line holds at least one unit, then swaps to a
+ * compact −/count/+ stepper. Used for plain buys and for refill/buy pairs alike.
+ */
+@Composable
+private fun AddOrStepper(
+    label: String,
+    count: Int,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    tonal: Boolean = false,
+    canIncrement: Boolean = true,
+) {
+    if (count <= 0) {
+        if (tonal) FilledTonalButton(onClick = onIncrement) { Text(label) }
+        else Button(onClick = onIncrement) { Text(label) }
+        return
+    }
+
+    val containerColor = if (tonal)
+        MaterialTheme.colorScheme.secondaryContainer
+    else
+        MaterialTheme.colorScheme.primary
+    val contentColor = if (tonal)
+        MaterialTheme.colorScheme.onSecondaryContainer
+    else
+        MaterialTheme.colorScheme.onPrimary
+
+    Surface(color = containerColor, shape = RoundedCornerShape(50)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDecrement, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    Icons.Filled.Remove,
+                    contentDescription = "Remove one $label",
+                    tint = contentColor,
+                )
+            }
+            Text(
+                "$count",
+                style = MaterialTheme.typography.titleMedium,
+                color = contentColor,
+            )
+            IconButton(
+                onClick = onIncrement,
+                enabled = canIncrement,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = "Add one $label",
+                    tint = if (canIncrement) contentColor else contentColor.copy(alpha = 0.4f),
+                )
             }
         }
     }
@@ -344,7 +542,8 @@ fun CartBar(itemCount: Int, amount: Double, onClick: () -> Unit) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp)
+            .padding(top = 12.dp, bottom = 6.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),

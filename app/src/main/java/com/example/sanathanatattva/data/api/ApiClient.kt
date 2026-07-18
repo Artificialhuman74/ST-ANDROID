@@ -40,25 +40,32 @@ object ApiClient {
             }
             .addInterceptor(logging)
 
-        // Debug builds talk to the dev backend on 10.0.2.2 which uses a
-        // self-signed certificate. Never enabled in release builds.
-        if (BuildConfig.TRUST_ALL_CERTS) {
-            val trustAll = object : X509TrustManager {
-                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-            }
-            val sslContext = SSLContext.getInstance("TLS").apply {
-                init(null, arrayOf(trustAll), SecureRandom())
-            }
-            builder.sslSocketFactory(sslContext.socketFactory, trustAll)
-            builder.hostnameVerifier { _, _ -> true }
-        }
+        trustDevCertIfConfigured(builder)
 
         return Retrofit.Builder()
             .baseUrl(BuildConfig.BASE_URL + "/")
             .client(builder.build())
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
+    }
+
+    /** Client for Coil image loads; shares the dev-cert trust config with the API client. */
+    fun imageHttpClient(): OkHttpClient =
+        OkHttpClient.Builder().also(::trustDevCertIfConfigured).build()
+
+    // Debug builds talk to the dev backend on 10.0.2.2 which uses a
+    // self-signed certificate. Never enabled in release builds.
+    private fun trustDevCertIfConfigured(builder: OkHttpClient.Builder) {
+        if (!BuildConfig.TRUST_ALL_CERTS) return
+        val trustAll = object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        }
+        val sslContext = SSLContext.getInstance("TLS").apply {
+            init(null, arrayOf(trustAll), SecureRandom())
+        }
+        builder.sslSocketFactory(sslContext.socketFactory, trustAll)
+        builder.hostnameVerifier { _, _ -> true }
     }
 }

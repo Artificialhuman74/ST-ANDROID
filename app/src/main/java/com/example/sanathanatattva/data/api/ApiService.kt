@@ -25,6 +25,13 @@ interface ApiService {
     @POST("api/auth/consumer/login")
     suspend fun login(@Body body: LoginRequest): AuthResponse
 
+    // Passwordless email login (backend pending; contract defined app-side).
+    @POST("api/auth/consumer/email/send-otp")
+    suspend fun sendEmailOtp(@Body body: SendEmailOtpRequest): SendEmailOtpResponse
+
+    @POST("api/auth/consumer/email/verify-otp")
+    suspend fun verifyEmailOtp(@Body body: VerifyOtpRequest): AuthResponse
+
     @POST("api/auth/consumer/google")
     suspend fun googleAuth(@Body body: GoogleAuthRequest): AuthResponse
 

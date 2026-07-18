@@ -52,6 +52,7 @@ import kotlinx.coroutines.launch
 import com.example.sanathanatattva.data.apiCall
 import com.example.sanathanatattva.data.model.UpdateProfileRequest
 import com.example.sanathanatattva.ui.appContainer
+import com.example.sanathanatattva.ui.components.DockContentClearance
 import com.example.sanathanatattva.ui.components.EmptyState
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
@@ -91,7 +92,7 @@ fun AccountScreen(navController: NavController, session: SessionViewModel) {
                 .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + DockContentClearance),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Profile card

@@ -7,7 +7,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Person
@@ -17,14 +18,11 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Storefront
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -37,6 +35,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.sanathanatattva.App
 import com.example.sanathanatattva.AppContainer
+import com.example.sanathanatattva.ui.components.DockItem
+import com.example.sanathanatattva.ui.components.LiquidDock
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.screens.account.AccountScreen
 import com.example.sanathanatattva.ui.screens.account.AddressesScreen
@@ -81,36 +81,7 @@ fun AppRoot() {
 
     val showBottomBar = currentRoute in bottomDests.map { it.route }
 
-    Scaffold(
-        bottomBar = {
-            if (showBottomBar) {
-                NavigationBar {
-                    bottomDests.forEach { dest ->
-                        val selected = currentRoute == dest.route
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(dest.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = {
-                                Icon(
-                                    if (selected) dest.selectedIcon else dest.icon,
-                                    contentDescription = dest.label,
-                                )
-                            },
-                            label = { Text(dest.label) },
-                        )
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
+    Scaffold { _ ->
         // Tab peers: near-instant fade (no slide — slides imply hierarchy, tabs are peers).
         // Push destinations: light horizontal slide + fade. Exit accelerates, enter decelerates.
         val tabFadeIn = fadeIn(tween(100))
@@ -132,12 +103,14 @@ fun AppRoot() {
             animationSpec = tween(200, easing = FastOutLinearInEasing),
         ) + fadeOut(tween(160))
 
+        // The dock floats over the content (not a reserved bar), so screens' scrolling
+        // content shows through behind it. Screens add DockContentClearance at the bottom
+        // so nothing stays trapped underneath.
+        Box(Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
             startDestination = Routes.SHOP,
-            modifier = Modifier.padding(
-                bottom = if (showBottomBar) innerPadding.calculateBottomPadding() else 0.dp
-            ),
+            modifier = Modifier.fillMaxSize(),
             // Default = tab-switch fade; push destinations override below.
             enterTransition = { tabFadeIn },
             exitTransition = { tabFadeOut },
@@ -220,6 +193,24 @@ fun AppRoot() {
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
             ) { VerifyPendingScreen(navController, session) }
+        }
+
+            if (showBottomBar) {
+                LiquidDock(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    items = bottomDests.map { DockItem(it.label, it.icon, it.selectedIcon) },
+                    selectedIndex = bottomDests.indexOfFirst { it.route == currentRoute },
+                    onSelect = { index ->
+                        navController.navigate(bottomDests[index].route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
         }
     }
 }

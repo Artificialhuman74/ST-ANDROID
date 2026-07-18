@@ -115,11 +115,12 @@ fun ProductDetailScreen(
                                 .crossfade(true)
                                 .build(),
                             contentDescription = "${product.name} photo ${page + 1}",
-                            contentScale = ContentScale.Crop,
+                            contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(260.dp)
-                                .clip(RoundedCornerShape(16.dp)),
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainer),
                         )
                     }
                     if (images.size > 1) {

@@ -19,18 +19,24 @@ import com.example.sanathanatattva.data.model.GoogleAuthRequest
 import com.example.sanathanatattva.data.model.LoginRequest
 import com.example.sanathanatattva.data.model.RegisterRequest
 import com.example.sanathanatattva.data.model.ResendVerificationRequest
+import com.example.sanathanatattva.data.model.SendEmailOtpRequest
 import com.example.sanathanatattva.data.model.VerifyOtpRequest
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 data class AuthUiState(
     val loading: Boolean = false,
     val error: String? = null,
     val info: String? = null,
+    /** True once a login code has been emailed; the screen shows the OTP entry. */
+    val emailOtpSent: Boolean = false,
     /** Dealer name when a referral code validates, null otherwise. */
     val referralDealerName: String? = null,
     val referralChecking: Boolean = false,
@@ -109,6 +115,55 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    /** Passwordless login, step 1: email a one-time code. */
+    fun sendEmailOtp(email: String) {
+        val e = email.trim()
+        if (!e.contains("@") || !e.contains(".") || e.length < 6) {
+            state.value = state.value.copy(error = "Enter a valid email address.")
+            return
+        }
+        state.value = state.value.copy(loading = true, error = null)
+        viewModelScope.launch {
+            apiCall { container.api.sendEmailOtp(SendEmailOtpRequest(e)) }
+                .onSuccess {
+                    state.value = state.value.copy(
+                        loading = false,
+                        emailOtpSent = true,
+                        info = "Code sent. Check your inbox and spam folder.",
+                    )
+                }
+                .onFailure { err ->
+                    state.value = state.value.copy(loading = false, error = err.message)
+                }
+        }
+    }
+
+    /** Passwordless login, step 2: exchange the emailed code for a session. */
+    fun verifyEmailLoginOtp(email: String, otp: String) {
+        if (otp.length != 6) {
+            state.value = state.value.copy(error = "Enter the 6-digit code from your email.")
+            return
+        }
+        state.value = state.value.copy(loading = true, error = null)
+        viewModelScope.launch {
+            apiCall { container.api.verifyEmailOtp(VerifyOtpRequest(email.trim(), otp.trim())) }
+                .onSuccess { res ->
+                    state.value = state.value.copy(loading = false)
+                    val token = res.token
+                    if (token != null) outcome.value = AuthOutcome.LoggedIn(token, res.consumer)
+                    else state.value = state.value.copy(error = "Unexpected response from the server.")
+                }
+                .onFailure { e ->
+                    state.value = state.value.copy(loading = false, error = e.message)
+                }
+        }
+    }
+
+    /** Back out of the OTP entry (change email / switch method). */
+    fun resetEmailOtp() {
+        state.value = state.value.copy(emailOtpSent = false, error = null, info = null)
+    }
+
     fun verifyOtp(email: String, otp: String) {
         if (otp.length != 6) {
             state.value = state.value.copy(error = "Enter the 6-digit code from your email.")
@@ -175,7 +230,9 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
                 val credentialManager = CredentialManager.create(context)
                 val googleIdOption = GetGoogleIdOption.Builder()
                     .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId(context.getString(R.string.google_web_client_id))
+                    // The Firebase project's web client (generated from google-services.json),
+                    // so the resulting Google token can be exchanged for a Firebase token below.
+                    .setServerClientId(context.getString(R.string.default_web_client_id))
                     .build()
                 val request = GetCredentialRequest.Builder()
                     .addCredentialOption(googleIdOption)
@@ -186,8 +243,24 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
                     credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
                 ) {
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                    val idToken = googleIdTokenCredential.idToken
-                    apiCall { container.api.googleAuth(GoogleAuthRequest(idToken)) }
+                    val googleIdToken = googleIdTokenCredential.idToken
+
+                    // The backend verifies with the Firebase Admin SDK, which expects a
+                    // Firebase ID token (aud = the Firebase project), not the raw Google
+                    // OAuth token. Exchange it on-device so Android shares the same
+                    // consumer identity as the web app.
+                    val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
+                    val authResult = FirebaseAuth.getInstance()
+                        .signInWithCredential(firebaseCredential).await()
+                    val firebaseIdToken = authResult.user?.getIdToken(false)?.await()?.token
+                    if (firebaseIdToken == null) {
+                        state.value = state.value.copy(
+                            loading = false,
+                            error = "Couldn't complete Google sign-in. Please try again.",
+                        )
+                        return@launch
+                    }
+                    apiCall { container.api.googleAuth(GoogleAuthRequest(firebaseIdToken)) }
                         .onSuccess { res ->
                             state.value = state.value.copy(loading = false)
                             val token = res.token
@@ -210,6 +283,13 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
                 )
             } catch (e: GetCredentialException) {
                 Log.e("GoogleAuth", "${e::class.simpleName} type=${e.type} msg=${e.message}", e)
+                state.value = state.value.copy(
+                    loading = false,
+                    error = "Google sign-in failed (${e::class.simpleName}). Check Logcat tag 'GoogleAuth' for details.",
+                )
+            } catch (e: Exception) {
+                // Covers the Firebase credential exchange (e.g. FirebaseAuthException).
+                Log.e("GoogleAuth", "Firebase exchange failed: ${e::class.simpleName} ${e.message}", e)
                 state.value = state.value.copy(
                     loading = false,
                     error = "Google sign-in failed (${e::class.simpleName}). Check Logcat tag 'GoogleAuth' for details.",

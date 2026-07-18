@@ -83,6 +83,15 @@ class ShopViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { container.cartStore.add(product, isRefill) }
     }
 
+    /** Removes one unit of a cart line; drops the line entirely when it hits zero. */
+    fun removeFromCart(productId: Long, isRefill: Boolean) {
+        val line = cartLines.value
+            .firstOrNull { it.productId == productId && it.isRefill == isRefill } ?: return
+        viewModelScope.launch {
+            container.cartStore.setQuantity(productId, isRefill, line.quantity - 1)
+        }
+    }
+
     /** Held containers not yet spoken for by refill lines already in the cart. */
     fun refillRemaining(productId: Long): Int {
         val held = state.value.refillCaps[productId] ?: 0

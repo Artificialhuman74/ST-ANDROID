@@ -153,7 +153,13 @@ fun SteelStorySheet(onDismiss: () -> Unit) {
                 StoryFrameContent(
                     page = page,
                     frame = frames[page],
-                    isSettled = pagerState.settledPage == page,
+                    // Play the beat the moment this frame becomes the target page, not
+                    // once it has fully settled. The beat opens from a dark spotlit
+                    // t = 0; triggering on settle meant an already-centred, fully-drawn
+                    // frame would blink back to that dark scrim and replay — the "shadow
+                    // before the card" flicker. Starting on currentPage folds that dark
+                    // open into the incoming slide, where the motion hides it.
+                    play = pagerState.currentPage == page,
                     reducedMotion = reducedMotion,
                     pageOffset = pageOffset,
                 )
@@ -208,16 +214,17 @@ private fun StoryProgress(count: Int, current: Int, modifier: Modifier = Modifie
 private fun StoryFrameContent(
     page: Int,
     frame: StoryFrame,
-    isSettled: Boolean,
+    play: Boolean,
     reducedMotion: Boolean,
     pageOffset: Float,
 ) {
-    // Master clock: one linear 0→1 sweep per landing on this page; each element
-    // carves its own eased segment out of it. Rest state (t = 1) is the fully
-    // composed, readable scene — also what reduced motion shows immediately.
+    // Master clock: one linear 0→1 sweep each time this frame becomes the target
+    // page; each element carves its own eased segment out of it. Rest state (t = 1)
+    // is the fully composed, readable scene — what a frame you've left rests at, and
+    // what reduced motion shows immediately.
     val clock = remember { Animatable(1f) }
-    LaunchedEffect(isSettled, reducedMotion) {
-        if (isSettled && !reducedMotion) {
+    LaunchedEffect(play, reducedMotion) {
+        if (play && !reducedMotion) {
             clock.snapTo(0f)
             clock.animateTo(1f, tween(PLAY_MS, easing = LinearEasing))
         } else {
@@ -239,9 +246,11 @@ private fun StoryFrameContent(
                 .fillMaxWidth()
                 .weight(1f)
                 .graphicsLayer {
-                    // Gentle parallax: the scene trails the swipe slightly.
+                    // Gentle parallax: the scene trails the swipe slightly. The alpha
+                    // dip is kept shallow so the incoming frame stays clearly a frame
+                    // (not a faded ghost) while it slides in and its beat opens.
                     translationX = pageOffset * size.width * 0.25f
-                    alpha = 1f - 0.4f * abs(pageOffset).coerceAtMost(1f)
+                    alpha = 1f - 0.18f * abs(pageOffset).coerceAtMost(1f)
                 },
         ) {
             drawStoryScene(page, t, sceneColors)
@@ -667,7 +676,7 @@ private fun DrawScope.drawSpotlight(page: Int, spot: Float, colors: SceneColors)
         frames.lastIndex -> center
         else -> Offset(size.width * 0.5f, size.height * 0.55f)
     }
-    val wash = lerp(0.10f, 0f, spot)
+    val wash = lerp(0.07f, 0f, spot)
     if (wash > 0.004f) {
         drawRect(color = colors.scrim.copy(alpha = wash))
     }

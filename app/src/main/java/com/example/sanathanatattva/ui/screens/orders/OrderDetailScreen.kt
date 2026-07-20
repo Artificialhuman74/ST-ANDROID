@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -67,7 +68,13 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.order?.order_number ?: "Order") },
+                title = {
+                    Text(
+                        state.order?.order_number ?: "Order",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -200,7 +207,12 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
                                 )
                                 Spacer(Modifier.width(10.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(item.product_name, style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        item.product_name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                     Text(
                                         buildString {
                                             append("${item.quantity} × ${formatRupees(item.price)}")

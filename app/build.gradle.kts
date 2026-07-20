@@ -1,8 +1,21 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.google.services)
+}
+
+// Release signing lives outside the repo entirely — see keystore.properties.example.
+// Builds fall back to unsigned when it's absent (e.g. a fresh checkout) so local/CI
+// builds don't hard-fail; only a real release upload needs it populated.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+val hasReleaseSigning = keystorePropertiesFile.exists()
+if (hasReleaseSigning) {
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
 }
 
 android {
@@ -14,13 +27,24 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.sanathanatattva"
+        applicationId = "com.sanathanatattva.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -31,8 +55,15 @@ android {
             buildConfigField("boolean", "TRUST_ALL_CERTS", "false")
         }
         release {
-            buildConfigField("String", "BASE_URL", "\"https://api.sanathanatattva.shop\"")
+            // Points at the live Railway backend (valid TLS cert). The vanity domain
+            // api.sanathanatattva.shop is not yet provisioned — it returns NXDOMAIN, which
+            // is why release builds (Play Store internal testing) couldn't reach the API.
+            // Swap back to the vanity domain once its DNS/cert are actually live.
+            buildConfigField("String", "BASE_URL", "\"https://sanathanatattava-production-67b1.up.railway.app\"")
             buildConfigField("boolean", "TRUST_ALL_CERTS", "false")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             optimization {
                 enable = false
             }

@@ -285,14 +285,14 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
                 Log.e("GoogleAuth", "${e::class.simpleName} type=${e.type} msg=${e.message}", e)
                 state.value = state.value.copy(
                     loading = false,
-                    error = "Google sign-in failed (${e::class.simpleName}). Check Logcat tag 'GoogleAuth' for details.",
+                    error = "Google sign-in didn't work. Please try again, or log in with your email and password.",
                 )
             } catch (e: Exception) {
                 // Covers the Firebase credential exchange (e.g. FirebaseAuthException).
                 Log.e("GoogleAuth", "Firebase exchange failed: ${e::class.simpleName} ${e.message}", e)
                 state.value = state.value.copy(
                     loading = false,
-                    error = "Google sign-in failed (${e::class.simpleName}). Check Logcat tag 'GoogleAuth' for details.",
+                    error = "Google sign-in didn't work. Please try again, or log in with your email and password.",
                 )
             }
         }

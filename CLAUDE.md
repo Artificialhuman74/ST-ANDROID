@@ -21,8 +21,8 @@ Sanathana Tattva is a single-module Android consumer shopping app (Kotlin, Jetpa
 ## Backend environments
 
 `BASE_URL` and `TRUST_ALL_CERTS` are BuildConfig fields set per build type in `app/build.gradle.kts`:
-- **debug**: `https://10.0.2.2:5001` (host machine's local backend from the emulator) with all TLS certs trusted (self-signed dev cert).
-- **release**: `https://api.sanathanatattva.shop`, normal cert validation.
+- **debug**: the Railway-hosted backend (`https://sanathanatattava-production-67b1.up.railway.app`), valid TLS cert, no trust-all. For a local backend use `https://10.0.2.2:5001` with `TRUST_ALL_CERTS = true`.
+- **release**: currently also the Railway backend, normal cert validation. The vanity domain `api.sanathanatattva.shop` is **not yet provisioned** (returns NXDOMAIN) — switch release back to it only once its DNS/cert are live.
 
 Backend error responses have the shape `{ "error": "..." }`.
 

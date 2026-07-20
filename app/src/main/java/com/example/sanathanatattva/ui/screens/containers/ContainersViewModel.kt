@@ -61,6 +61,7 @@ class ContainersViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     private fun runAction(successMessage: String, block: suspend () -> Unit) {
+        if (state.value.actionInProgress) return
         state.value = state.value.copy(actionInProgress = true, actionMessage = null)
         viewModelScope.launch {
             apiCall { block() }

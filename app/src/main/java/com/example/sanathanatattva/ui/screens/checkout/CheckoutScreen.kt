@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -146,6 +149,7 @@ private fun FormContent(vm: CheckoutViewModel, state: CheckoutUiState, modifier:
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .imePadding()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -174,8 +178,14 @@ private fun FormContent(vm: CheckoutViewModel, state: CheckoutUiState, modifier:
                         onClick = { vm.selectAddress(address.id) },
                     )
                     Column(Modifier.weight(1f)) {
-                        Row {
-                            Text(address.label, style = MaterialTheme.typography.titleSmall)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                address.label,
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
                             if (address.is_default == 1) {
                                 Spacer(Modifier.width(6.dp))
                                 Text(
@@ -333,7 +343,7 @@ private fun FormContent(vm: CheckoutViewModel, state: CheckoutUiState, modifier:
             enabled = state.stage == CheckoutStage.Form,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp),
+                .heightIn(min = 52.dp),
         ) {
             Text("Pay ${formatRupees(est.total)}")
         }
@@ -461,7 +471,7 @@ private fun SuccessContent(
             onClick = onTrackOrder,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp),
+                .heightIn(min = 52.dp),
         ) { Text("Track order") }
         TextButton(onClick = onBackToShop) { Text("Back to shop") }
     }

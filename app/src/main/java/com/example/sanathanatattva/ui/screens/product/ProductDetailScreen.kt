@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.request.ImageRequest
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,7 +73,13 @@ fun ProductDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.product?.name ?: "") },
+                title = {
+                    Text(
+                        state.product?.name ?: "",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -213,17 +221,17 @@ fun ProductDetailScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             onClick = { vm.addToCart(true); navController.popBackStack() },
-                            modifier = Modifier.weight(1f).height(52.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                         ) { Text("Add refill") }
                         FilledTonalButton(
                             onClick = { vm.addToCart(false); navController.popBackStack() },
-                            modifier = Modifier.weight(1f).height(52.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                         ) { Text("Buy with container") }
                     }
                 } else {
                     Button(
                         onClick = { vm.addToCart(false); navController.popBackStack() },
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                     ) { Text("Add to cart") }
                 }
 
@@ -270,7 +278,13 @@ fun ProductDetailScreen(
                     state.reviews.forEach { review ->
                         Column(Modifier.padding(vertical = 8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(review.consumer_name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    review.consumer_name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
                                 Spacer(Modifier.width(6.dp))
                                 repeat(review.rating.coerceIn(0, 5)) {
                                     Icon(

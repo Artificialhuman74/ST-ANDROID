@@ -1,17 +1,26 @@
 package com.example.sanathanatattva.ui.screens.shop
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,6 +41,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
@@ -43,9 +54,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -60,6 +73,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -67,9 +81,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -89,6 +116,7 @@ import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
 import com.example.sanathanatattva.util.formatRupees
 import java.util.Calendar
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -139,6 +167,33 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
         }
     }
 
+    // Search + category row: collapses in lockstep with the scroll gesture itself
+    // (like a real collapsing toolbar) rather than snapping open/shut at a
+    // threshold — the greeting above it stays put. headerHeightPx is the row's
+    // natural height, captured on first layout; headerOffsetPx is how much of
+    // that height the scroll has "spent" so far, from 0 (fully open) down to
+    // -headerHeightPx (fully collapsed). onPreScroll eats scroll into this
+    // offset before the list ever sees it, so the header visibly eats the
+    // finger's motion first — collapsing/expanding it takes exactly as much
+    // scroll as its own height, in either direction, from anywhere in the list.
+    // These update on every scroll frame, so they must never be read at composition
+    // scope — only inside the deferred layout/graphicsLayer lambdas below, where a
+    // change re-lays-out / re-draws the header without recomposing the whole screen.
+    // (mutableFloatStateOf avoids autoboxing each of those frequent writes.)
+    var headerHeightPx by remember { mutableFloatStateOf(0f) }
+    var headerOffsetPx by remember { mutableFloatStateOf(0f) }
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (headerHeightPx <= 0f) return Offset.Zero
+                val newOffset = (headerOffsetPx + available.y).coerceIn(-headerHeightPx, 0f)
+                val consumed = newOffset - headerOffsetPx
+                headerOffsetPx = newOffset
+                return Offset(0f, consumed)
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -164,7 +219,7 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
         // The bottom navigation dock floats over this content (see AppRoot), so the
         // list scrolls behind it and the cart bar is overlaid just above it.
         Box(Modifier.padding(padding).fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)) {
 
             Text(
                 greeting,
@@ -179,39 +234,68 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
             )
 
-            OutlinedTextField(
-                value = state.search,
-                onValueChange = vm::setSearch,
-                placeholder = { Text("Search oils, ghee…") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { vm.submitSearch() }),
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-
-            if (state.categories.isNotEmpty()) {
-                LazyRow(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(vertical = 8.dp),
-                ) {
-                    item {
-                        FilterChip(
-                            selected = state.selectedCategory == null,
-                            onClick = { vm.selectCategory(null) },
-                            label = { Text("All") },
+                    .clipToBounds()
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(
+                            constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity),
                         )
+                        if (headerHeightPx != placeable.height.toFloat()) {
+                            headerHeightPx = placeable.height.toFloat()
+                            headerOffsetPx = headerOffsetPx.coerceIn(-headerHeightPx, 0f)
+                        }
+                        val visibleHeight = (headerHeightPx + headerOffsetPx)
+                            .roundToInt()
+                            .coerceIn(0, placeable.height)
+                        layout(placeable.width, visibleHeight) {
+                            placeable.placeRelative(0, headerOffsetPx.roundToInt())
+                        }
                     }
-                    items(state.categories) { category ->
-                        FilterChip(
-                            selected = state.selectedCategory == category,
-                            onClick = { vm.selectCategory(category) },
-                            label = { Text(category.replaceFirstChar(Char::uppercase)) },
-                        )
+                    // Fades as it shrinks so the search field's rounded outline
+                    // dissolves away rather than looking guillotined by the clip.
+                    // The collapse fraction is derived *inside* the layer block so the
+                    // scroll-driven state reads here (draw scope) and not in composition.
+                    .graphicsLayer {
+                        alpha = 1f - if (headerHeightPx > 0f) {
+                            (-headerOffsetPx / headerHeightPx).coerceIn(0f, 1f)
+                        } else 0f
+                    },
+            ) {
+                OutlinedTextField(
+                    value = state.search,
+                    onValueChange = vm::setSearch,
+                    placeholder = { Text("Search oils, ghee…") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(28.dp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { vm.submitSearch() }),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+
+                if (state.categories.isNotEmpty()) {
+                    LazyRow(
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = state.selectedCategory == null,
+                                onClick = { vm.selectCategory(null) },
+                                label = { Text("All") },
+                            )
+                        }
+                        items(state.categories, key = { it }) { category ->
+                            FilterChip(
+                                selected = state.selectedCategory == category,
+                                onClick = { vm.selectCategory(category) },
+                                label = { Text(category.replaceFirstChar(Char::uppercase)) },
+                            )
+                        }
                     }
                 }
             }
@@ -396,7 +480,12 @@ private fun ProductCard(
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(product.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    product.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text(
                     "per ${product.unit}",
                     style = MaterialTheme.typography.labelMedium,
@@ -480,8 +569,62 @@ private fun ProductCard(
 }
 
 /**
+ * A soft, gooey press response for the Add/Refill controls — the app's one
+ * repeat-order hero interaction. Squashes asymmetrically on press (wider,
+ * shorter, like a drop of liquid under a finger), then the two axes spring
+ * back on their own independent timing so the release reads as a wobble
+ * rather than a snap. A faint sheen brightens with the press for a glassy
+ * read. Buy's controls intentionally don't get this — they're a different,
+ * plainer action. Fully skipped under reduced motion.
+ */
+@Composable
+private fun rememberLiquidSquish(pressed: Boolean, reducedMotion: Boolean): Modifier {
+    val scaleX = remember { Animatable(1f) }
+    val scaleY = remember { Animatable(1f) }
+    val sheen = remember { Animatable(0f) }
+
+    LaunchedEffect(pressed, reducedMotion) {
+        if (reducedMotion) {
+            scaleX.snapTo(1f)
+            scaleY.snapTo(1f)
+            sheen.snapTo(0f)
+            return@LaunchedEffect
+        }
+        if (pressed) {
+            launch { scaleX.animateTo(1.08f, tween(90, easing = FastOutSlowInEasing)) }
+            launch { scaleY.animateTo(0.88f, tween(90, easing = FastOutSlowInEasing)) }
+            launch { sheen.animateTo(0.30f, tween(90)) }
+        } else {
+            launch { scaleX.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 260f)) }
+            launch { scaleY.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 340f)) }
+            launch { sheen.animateTo(0f, tween(240)) }
+        }
+    }
+
+    return Modifier
+        .graphicsLayer {
+            this.scaleX = scaleX.value
+            this.scaleY = scaleY.value
+        }
+        .drawWithContent {
+            drawContent()
+            if (sheen.value > 0f) {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.White.copy(alpha = sheen.value), Color.Transparent),
+                        center = Offset(size.width * 0.5f, size.height * 0.3f),
+                        radius = size.maxDimension * 0.75f,
+                    ),
+                )
+            }
+        }
+}
+
+/**
  * Shows an add button until the line holds at least one unit, then swaps to a
- * compact −/count/+ stepper. Used for plain buys and for refill/buy pairs alike.
+ * stepper. Buy keeps its fused sage pill with a plain instant swap; Add/Refill
+ * (tonal = false) morph — the pill visibly divides into the two green circles
+ * instead of hard-cutting from one control to the other.
  */
 @Composable
 private fun AddOrStepper(
@@ -492,20 +635,87 @@ private fun AddOrStepper(
     tonal: Boolean = false,
     canIncrement: Boolean = true,
 ) {
-    if (count <= 0) {
-        if (tonal) FilledTonalButton(onClick = onIncrement) { Text(label) }
-        else Button(onClick = onIncrement) { Text(label) }
+    if (tonal) {
+        if (count <= 0) {
+            FilledTonalButton(onClick = onIncrement) { Text(label) }
+        } else {
+            FusedStepper(
+                label = label,
+                count = count,
+                onIncrement = onIncrement,
+                onDecrement = onDecrement,
+                canIncrement = canIncrement,
+            )
+        }
         return
     }
 
-    val containerColor = if (tonal)
-        MaterialTheme.colorScheme.secondaryContainer
-    else
-        MaterialTheme.colorScheme.primary
-    val contentColor = if (tonal)
-        MaterialTheme.colorScheme.onSecondaryContainer
-    else
-        MaterialTheme.colorScheme.onPrimary
+    val reducedMotion = rememberReducedMotion()
+    AnimatedContent(
+        targetState = count > 0,
+        contentAlignment = Alignment.Center,
+        transitionSpec = {
+            val enterExit = if (reducedMotion) {
+                fadeIn(snap()) togetherWith fadeOut(snap())
+            } else if (targetState) {
+                // The pill dissolves as the two circles pop apart with a
+                // liquid overshoot — like a droplet dividing in two.
+                (fadeIn(tween(170, delayMillis = 70)) +
+                    scaleIn(
+                        initialScale = 0.5f,
+                        animationSpec = spring(dampingRatio = 0.48f, stiffness = 330f),
+                    )) togetherWith
+                    (fadeOut(tween(90)) +
+                        scaleOut(targetScale = 0.65f, animationSpec = tween(110)))
+            } else {
+                // The two droplets rejoin back into a single pill.
+                (fadeIn(tween(170, delayMillis = 50)) +
+                    scaleIn(
+                        initialScale = 0.75f,
+                        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+                    )) togetherWith
+                    (fadeOut(tween(110)) +
+                        scaleOut(targetScale = 0.6f, animationSpec = tween(140)))
+            }
+            enterExit.using(
+                SizeTransform(clip = false) { _, _ ->
+                    if (reducedMotion) snap() else spring(dampingRatio = 0.7f, stiffness = 280f)
+                },
+            )
+        },
+        label = "addRefillMorph",
+    ) { hasQuantity ->
+        if (hasQuantity) {
+            UnfusedStepper(
+                label = label,
+                count = count,
+                onIncrement = onIncrement,
+                onDecrement = onDecrement,
+                canIncrement = canIncrement,
+            )
+        } else {
+            val interactionSource = remember { MutableInteractionSource() }
+            val pressed by interactionSource.collectIsPressedAsState()
+            Button(
+                onClick = onIncrement,
+                interactionSource = interactionSource,
+                modifier = rememberLiquidSquish(pressed, reducedMotion),
+            ) { Text(label) }
+        }
+    }
+}
+
+/** Buy's stepper: one sage pill — its own visual language, kept distinct from a refill. */
+@Composable
+private fun FusedStepper(
+    label: String,
+    count: Int,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    canIncrement: Boolean,
+) {
+    val containerColor = MaterialTheme.colorScheme.secondaryContainer
+    val contentColor = MaterialTheme.colorScheme.onSecondaryContainer
 
     Surface(color = containerColor, shape = RoundedCornerShape(50)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -536,33 +746,129 @@ private fun AddOrStepper(
     }
 }
 
+/**
+ * Add/Refill's stepper: two standalone green circular buttons with the count
+ * as plain text between them — deliberately not one merged shape.
+ */
+@Composable
+private fun UnfusedStepper(
+    label: String,
+    count: Int,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    canIncrement: Boolean,
+) {
+    val reducedMotion = rememberReducedMotion()
+    val decrementSource = remember { MutableInteractionSource() }
+    val decrementPressed by decrementSource.collectIsPressedAsState()
+    val incrementSource = remember { MutableInteractionSource() }
+    val incrementPressed by incrementSource.collectIsPressedAsState()
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        FilledIconButton(
+            onClick = onDecrement,
+            interactionSource = decrementSource,
+            modifier = Modifier
+                .size(44.dp)
+                .then(rememberLiquidSquish(decrementPressed, reducedMotion)),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        ) {
+            Icon(Icons.Filled.Remove, contentDescription = "Remove one $label")
+        }
+        Text(
+            "$count",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(min = 22.dp),
+        )
+        FilledIconButton(
+            onClick = onIncrement,
+            enabled = canIncrement,
+            interactionSource = incrementSource,
+            modifier = Modifier
+                .size(44.dp)
+                .then(rememberLiquidSquish(incrementPressed, reducedMotion)),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.38f),
+                disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+            ),
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = "Add one $label")
+        }
+    }
+}
+
 @Composable
 fun CartBar(itemCount: Int, amount: Double, onClick: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        // Bolder presence: rounder, and lifted well clear of the dock so the primary
+        // conversion action reads as the loudest thing on the screen.
+        shape = RoundedCornerShape(20.dp),
+        shadowElevation = 12.dp,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .padding(top = 12.dp, bottom = 6.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
     ) {
         Row(
-            Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            Modifier.padding(start = 12.dp, end = 20.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                if (itemCount == 1) "1 item · ${formatRupees(amount)}"
-                else "$itemCount items · ${formatRupees(amount)}",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
+            // Count badge — a solid onPrimary chip that anchors the bar.
+            Box(
+                Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.onPrimary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "$itemCount",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(
+                    if (itemCount == 1) "1 item in your cart" else "in your cart",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
+                )
+                Text(
+                    formatRupees(amount),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
             Spacer(Modifier.weight(1f))
             Text(
                 "View cart",
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
             )
         }
     }

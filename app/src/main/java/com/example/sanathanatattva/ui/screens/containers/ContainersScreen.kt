@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -149,6 +150,7 @@ fun ContainersScreen(navController: NavController, session: SessionViewModel) {
                             items(list, key = { it.id }) { holding ->
                                 HoldingCard(
                                     holding = holding,
+                                    actionInProgress = state.actionInProgress,
                                     onRequestRefund = { refundTarget = holding },
                                     onCancelRefund = { vm.cancelRefund(holding.id) },
                                     onSwap = { swapTarget = holding },
@@ -210,6 +212,7 @@ fun ContainersScreen(navController: NavController, session: SessionViewModel) {
 @Composable
 private fun HoldingCard(
     holding: ContainerHolding,
+    actionInProgress: Boolean,
     onRequestRefund: () -> Unit,
     onCancelRefund: () -> Unit,
     onSwap: () -> Unit,
@@ -226,6 +229,8 @@ private fun HoldingCard(
                     Text(
                         holding.current_product_name ?: "Container",
                         style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         "${holding.container_type} container",
@@ -261,8 +266,10 @@ private fun HoldingCard(
                 "held" -> {
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onRequestRefund) { Text("Return for refund") }
-                        OutlinedButton(onClick = onSwap) { Text("Swap oil") }
+                        OutlinedButton(onClick = onRequestRefund, enabled = !actionInProgress) {
+                            Text("Return for refund")
+                        }
+                        OutlinedButton(onClick = onSwap, enabled = !actionInProgress) { Text("Swap oil") }
                     }
                 }
 
@@ -274,7 +281,9 @@ private fun HoldingCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(6.dp))
-                    OutlinedButton(onClick = onCancelRefund) { Text("Keep the container") }
+                    OutlinedButton(onClick = onCancelRefund, enabled = !actionInProgress) {
+                        Text("Keep the container")
+                    }
                 }
 
                 "forfeited" -> {
@@ -285,7 +294,9 @@ private fun HoldingCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(6.dp))
-                    OutlinedButton(onClick = onDispute) { Text("Open a dispute") }
+                    OutlinedButton(onClick = onDispute, enabled = !actionInProgress) {
+                        Text("Open a dispute")
+                    }
                 }
             }
         }

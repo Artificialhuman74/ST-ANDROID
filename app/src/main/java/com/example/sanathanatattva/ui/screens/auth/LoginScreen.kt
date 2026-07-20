@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -79,12 +80,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -292,7 +295,7 @@ private fun HeroPanel() {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Sign in to reorder in seconds and track your containers.",
+                "Log in to reorder in seconds and track your containers.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Green100,
                 textAlign = TextAlign.Center,
@@ -320,11 +323,20 @@ private fun GlassTabSlider(
 ) {
     val shape = RoundedCornerShape(30.dp)
     val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     var widthPx by remember { mutableIntStateOf(0) }
     val padPx = with(density) { 5.dp.toPx() }
     val thumbW = if (widthPx > 0) (widthPx - 2f * padPx) / options.size else 0f
+    // The options Row auto-mirrors under RTL; mirror the thumb's own left-edge
+    // math the same way so it lands under the (visually reordered) selected label.
+    val leftEdgeX = padPx + selected * thumbW
+    val thumbTarget = if (layoutDirection == LayoutDirection.Rtl) {
+        widthPx - leftEdgeX - thumbW
+    } else {
+        leftEdgeX
+    }
     val thumbX by animateFloatAsState(
-        targetValue = padPx + selected * thumbW,
+        targetValue = thumbTarget,
         animationSpec = if (reducedMotion) snap() else spring(dampingRatio = 0.72f, stiffness = 380f),
         label = "glass-thumb",
     )
@@ -578,7 +590,7 @@ private fun PhonePane(loading: Boolean) {
         Spacer(Modifier.height(18.dp))
         PrimaryActionButton(
             text = "Get OTP",
-            loading = false,
+            loading = loading,
             onClick = {
                 if (phone.length != 10) {
                     fieldError = "Enter your 10-digit mobile number."
@@ -608,7 +620,7 @@ private fun PhonePane(loading: Boolean) {
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "Phone login is coming soon. Use email or Google to sign in today.",
+                    "Phone login is coming soon. Use email or Google to log in today.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
@@ -628,7 +640,7 @@ private fun PrimaryActionButton(text: String, loading: Boolean, onClick: () -> U
         enabled = !loading,
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp),
+            .heightIn(min = 56.dp),
     ) {
         if (loading) {
             CircularProgressIndicator(
@@ -710,7 +722,7 @@ fun GoogleSignInButton(loading: Boolean, onClick: () -> Unit) {
         enabled = !loading,
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp),
+            .heightIn(min = 56.dp),
     ) {
         Icon(
             painter = painterResource(R.drawable.ic_google),

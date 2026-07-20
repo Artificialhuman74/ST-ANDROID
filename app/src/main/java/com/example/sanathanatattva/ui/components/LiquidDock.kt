@@ -1,10 +1,10 @@
 package com.example.sanathanatattva.ui.components
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,19 +27,31 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 /** One destination in the [LiquidDock]. */
 data class DockItem(
@@ -75,18 +87,36 @@ fun LiquidDock(
     if (items.isEmpty()) return
     val reduced = rememberReducedMotion()
     val safeIndex = selectedIndex.coerceIn(0, items.lastIndex)
+    val scope = rememberCoroutineScope()
+    // A springy settle: low damping gives a small elastic overshoot, and a soft
+    // stiffness keeps the glide liquid rather than mechanical. Paired with the
+    // release-velocity fling below, tab changes read as one physical throw-and-settle.
+    val settle = spring<Float>(dampingRatio = 0.6f, stiffness = 340f)
+    // The drag gesture below outlives individual selections (its pointerInput only
+    // restarts when the track geometry changes), so read these through the latest
+    // composition instead of the stale values captured when the gesture began.
+    val currentIndex by rememberUpdatedState(safeIndex)
+    val currentOnSelect by rememberUpdatedState(onSelect)
 
-    // Continuous position of the pill in "slot units" (0..lastIndex). The whole
-    // effect hangs off this one animated value.
-    val animIndex by animateFloatAsState(
-        targetValue = safeIndex.toFloat(),
-        animationSpec = if (reduced) {
-            snap()
-        } else {
-            spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
-        },
-        label = "dockPill",
-    )
+    // The pill's continuous position in "slot units" (0..lastIndex). A single value the
+    // whole effect hangs off: the finger drives it during a drag, and it springs to the
+    // selected slot the rest of the time.
+    val pill = remember { Animatable(safeIndex.toFloat()) }
+    // Live finger position while a drag is in progress; null when not dragging. It
+    // overrides [pill] so the pill sits exactly under the finger with no spring lag.
+    var dragPos by remember { mutableStateOf<Float?>(null) }
+    // Accumulates pointer samples during a drag so release can read a real flick
+    // velocity and hand it to the settle spring.
+    val velocityTracker = remember { VelocityTracker() }
+
+    // Glide to the selected slot whenever the selection changes from outside a drag
+    // (a tap, or back-stack navigation). Skipped mid-drag so it can't fight the finger.
+    LaunchedEffect(safeIndex) {
+        if (dragPos == null) {
+            if (reduced) pill.snapTo(safeIndex.toFloat())
+            else pill.animateTo(safeIndex.toFloat(), settle)
+        }
+    }
 
     Surface(
         modifier = modifier
@@ -107,36 +137,124 @@ fun LiquidDock(
             val trackWidthPx = constraints.maxWidth.toFloat()
             val slotPx = trackWidthPx / count
             val density = LocalDensity.current
-            val pillInsetPx = with(density) { 6.dp.toPx() }
+            val layoutDirection = LocalLayoutDirection.current
+            // Small gap between the pill and its slot edges. Kept tight so the pill is
+            // wide enough to fully carry the longest label ("Containers") on green.
+            val pillInsetPx = with(density) { 3.dp.toPx() }
             val pillWidthDp = with(density) { (slotPx - pillInsetPx * 2f).toDp() }
 
+            // Convert a pointer x (in track px) into a clamped, centred slot position.
+            // Mirrored under RTL to match the Row's auto-mirrored child order.
+            fun posFor(x: Float): Float {
+                val logicalX = if (layoutDirection == LayoutDirection.Rtl) trackWidthPx - x else x
+                return (logicalX / slotPx - 0.5f).coerceIn(0f, (count - 1).toFloat())
+            }
+            // The position everything renders from: the finger when dragging, else the pill.
+            val pillPos = dragPos ?: pill.value
+
             // Fractional distance from the nearest slot → 0 at rest, ~0.5 mid-flight.
-            val frac = animIndex - animIndex.roundToInt()
-            val stretch = 1f + 0.30f * (abs(frac) * 2f)
+            val frac = pillPos - pillPos.roundToInt()
+            // Speed of the pill right now, in slot-units/sec — the spring's own
+            // velocity as it glides and overshoots (≈0 while a finger holds it).
+            val speed = abs(pill.velocity)
+            // Elastic deformation: the pill bulges along its direction of travel —
+            // partly from how far it sits between slots, partly from raw speed — then
+            // thins on the cross axis to conserve volume, so it reads as a gel blob
+            // being flung rather than a rectangle being scaled.
+            val stretch = (1f + 0.26f * (abs(frac) * 2f) + 0.16f * (speed / 14f).coerceIn(0f, 1f))
+                .coerceAtMost(1.5f)
 
             Box(
                 Modifier
                     .offset {
-                        IntOffset((slotPx * animIndex + pillInsetPx).roundToInt(), 0)
+                        // Row auto-mirrors its children under RTL, so item i renders at
+                        // visual slot (count-1-i); the pill's own offset math is always
+                        // LTR-pixel-space and needs the same mirror to line up.
+                        val leftX = slotPx * pillPos + pillInsetPx
+                        val x = if (layoutDirection == LayoutDirection.Rtl) {
+                            val pillWidthPx = with(density) { pillWidthDp.toPx() }
+                            trackWidthPx - leftX - pillWidthPx
+                        } else {
+                            leftX
+                        }
+                        IntOffset(x.roundToInt(), 0)
                     }
                     .width(pillWidthDp)
                     .fillMaxHeight()
-                    .graphicsLayer { scaleX = stretch }
+                    .graphicsLayer {
+                        scaleX = stretch
+                        // Volume-preserving squash: as it widens it flattens a little,
+                        // the way a droplet does when it's pulled sideways.
+                        scaleY = 1f - 0.5f * (stretch - 1f)
+                    }
                     .background(
                         color = MaterialTheme.colorScheme.primary,
                         shape = RoundedCornerShape(22.dp),
                     ),
             )
 
-            Row(Modifier.fillMaxSize()) {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    // Drag the pill directly: it tracks the finger, and on release snaps
+                    // to (and selects) whichever destination it settled over. Taps on the
+                    // destinations below still work — a tap isn't a drag.
+                    .pointerInput(count, slotPx) {
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                velocityTracker.resetTracking()
+                                dragPos = posFor(it.x)
+                            },
+                            onHorizontalDrag = { change, _ ->
+                                velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                dragPos = posFor(change.position.x)
+                            },
+                            onDragEnd = {
+                                val finger = dragPos ?: return@detectHorizontalDragGestures
+                                // Release velocity, track-px/s → slot-units/s. Mirrored
+                                // under RTL, where sliding right lowers the slot index.
+                                val vxPx = velocityTracker.calculateVelocity().x
+                                val vSlots =
+                                    (if (layoutDirection == LayoutDirection.Rtl) -vxPx else vxPx) / slotPx
+                                // A flick throws the pill onward: bias the landing by the
+                                // release velocity so a fast swipe commits to the next
+                                // destination even when let go early.
+                                val landed = (finger + vSlots * 0.10f)
+                                    .roundToInt().coerceIn(0, items.lastIndex)
+                                if (landed != currentIndex) currentOnSelect(landed)
+                                // Hand the finger's position to [pill] BEFORE clearing the
+                                // override, so the pill keeps sitting exactly where it was
+                                // let go and settles onto the slot from there — no snap back
+                                // to the old position while navigation catches up.
+                                scope.launch {
+                                    pill.snapTo(finger)
+                                    dragPos = null
+                                    if (reduced) pill.snapTo(landed.toFloat())
+                                    // Carry the flick's momentum into the spring: a real
+                                    // fling that overshoots and settles, not a fresh glide.
+                                    else pill.animateTo(landed.toFloat(), settle, initialVelocity = vSlots)
+                                }
+                            },
+                            onDragCancel = {
+                                val finger = dragPos
+                                scope.launch {
+                                    if (finger != null) pill.snapTo(finger)
+                                    dragPos = null
+                                    pill.animateTo(currentIndex.toFloat(), settle)
+                                }
+                            },
+                        )
+                    },
+            ) {
                 items.forEachIndexed { i, item ->
                     // 1 when the pill is centred on this item, fading to 0 as it leaves.
-                    val on = (1f - abs(animIndex - i)).coerceIn(0f, 1f)
+                    val on = (1f - abs(pillPos - i)).coerceIn(0f, 1f)
                     val contentColor = lerp(
                         MaterialTheme.colorScheme.onSurfaceVariant,
                         MaterialTheme.colorScheme.onPrimary,
                         on,
                     )
+                    val interaction = remember { MutableInteractionSource() }
                     Column(
                         Modifier
                             .weight(1f)
@@ -144,6 +262,11 @@ fun LiquidDock(
                             .clip(RoundedCornerShape(22.dp))
                             .selectable(
                                 selected = i == safeIndex,
+                                interactionSource = interaction,
+                                // No ripple: the gliding pill is the only selection
+                                // feedback, so a tap no longer flashes a second "ghost"
+                                // pill at the target before the real one slides in.
+                                indication = null,
                                 role = Role.Tab,
                                 onClick = { onSelect(i) },
                             ),
@@ -168,6 +291,12 @@ fun LiquidDock(
                             style = MaterialTheme.typography.labelMedium,
                             color = contentColor,
                             maxLines = 1,
+                            softWrap = false,
+                            // Tuck the label a hair in from the pill edges and tighten
+                            // tracking so the longest word ("Containers") sits fully on
+                            // the green instead of bleeding onto the dock behind it.
+                            letterSpacing = 0.sp,
+                            modifier = Modifier.padding(horizontal = 2.dp),
                         )
                     }
                 }

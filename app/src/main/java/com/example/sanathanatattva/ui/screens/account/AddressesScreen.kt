@@ -36,8 +36,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -60,6 +62,9 @@ data class AddressesUiState(
     val addresses: List<Address> = emptyList(),
     val saving: Boolean = false,
     val saveError: String? = null,
+    // Address ids with a make-default/delete request in flight — guards against
+    // a double-tap firing the same request twice before the list reloads.
+    val updatingIds: Set<Long> = emptySet(),
 )
 
 class AddressesViewModel(private val container: AppContainer) : ViewModel() {
@@ -97,15 +102,21 @@ class AddressesViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun delete(id: Long) {
+        if (id in state.value.updatingIds) return
+        state.value = state.value.copy(updatingIds = state.value.updatingIds + id)
         viewModelScope.launch {
             apiCall { container.api.deleteAddress(id) }
+            state.value = state.value.copy(updatingIds = state.value.updatingIds - id)
             load()
         }
     }
 
     fun makeDefault(id: Long) {
+        if (id in state.value.updatingIds) return
+        state.value = state.value.copy(updatingIds = state.value.updatingIds + id)
         viewModelScope.launch {
             apiCall { container.api.makeDefaultAddress(id) }
+            state.value = state.value.copy(updatingIds = state.value.updatingIds - id)
             load()
         }
     }
@@ -175,9 +186,16 @@ fun AddressesScreen(navController: NavController) {
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                         ),
                     ) {
+                        val updating = address.id in state.updatingIds
                         Column(Modifier.padding(16.dp)) {
-                            Row {
-                                Text(address.label, style = MaterialTheme.typography.titleSmall)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    address.label,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
                                 if (address.is_default == 1) {
                                     Spacer(Modifier.width(8.dp))
                                     Text(
@@ -196,15 +214,24 @@ fun AddressesScreen(navController: NavController) {
                             )
                             Spacer(Modifier.height(4.dp))
                             Row {
-                                TextButton(onClick = { editing = address; showForm = true }) {
+                                TextButton(
+                                    onClick = { editing = address; showForm = true },
+                                    enabled = !updating,
+                                ) {
                                     Text("Edit")
                                 }
                                 if (address.is_default != 1) {
-                                    TextButton(onClick = { vm.makeDefault(address.id) }) {
+                                    TextButton(
+                                        onClick = { vm.makeDefault(address.id) },
+                                        enabled = !updating,
+                                    ) {
                                         Text("Make default")
                                     }
                                 }
-                                TextButton(onClick = { deleting = address }) {
+                                TextButton(
+                                    onClick = { deleting = address },
+                                    enabled = !updating,
+                                ) {
                                     Text("Delete", color = MaterialTheme.colorScheme.error)
                                 }
                             }

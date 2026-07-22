@@ -30,8 +30,8 @@ android {
         applicationId = "com.sanathanatattva.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 4
+        versionName = "4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -66,6 +66,11 @@ android {
             }
             optimization {
                 enable = false
+            }
+            // Package native debug symbols (from Razorpay etc.) into the AAB so Play
+            // can symbolicate native crashes/ANRs — clears the "no debug symbols" warning.
+            ndk {
+                debugSymbolLevel = "FULL"
             }
         }
     }

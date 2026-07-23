@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -54,6 +55,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.sanathanatattva.ui.appContainer
 import com.example.sanathanatattva.ui.navigation.Routes
+import com.example.sanathanatattva.ui.components.TintedIcon
+import com.example.sanathanatattva.ui.components.cardBorder
 import com.example.sanathanatattva.ui.session.SessionViewModel
 import com.example.sanathanatattva.util.formatRupees
 import com.razorpay.Checkout
@@ -65,6 +68,7 @@ fun CheckoutScreen(navController: NavController, session: SessionViewModel) {
     val container = appContainer()
     val vm: CheckoutViewModel = viewModel { CheckoutViewModel(container) }
     val state by vm.state.collectAsState()
+    val consumer by session.consumer.collectAsState()
     val context = LocalContext.current
 
     // Open the Razorpay sheet when the ViewModel asks for it.
@@ -136,13 +140,18 @@ fun CheckoutScreen(navController: NavController, session: SessionViewModel) {
                 }
             }
 
-            else -> FormContent(vm, state, Modifier.padding(padding))
+            else -> FormContent(vm, state, consumer?.dealer, Modifier.padding(padding))
         }
     }
 }
 
 @Composable
-private fun FormContent(vm: CheckoutViewModel, state: CheckoutUiState, modifier: Modifier) {
+private fun FormContent(
+    vm: CheckoutViewModel,
+    state: CheckoutUiState,
+    partner: com.example.sanathanatattva.data.model.LinkedDealer?,
+    modifier: Modifier,
+) {
     val est = vm.estimate()
 
     Column(
@@ -232,12 +241,36 @@ private fun FormContent(vm: CheckoutViewModel, state: CheckoutUiState, modifier:
             }
         }
 
+        // ---- Your partner (the local seller who fulfils this order) ----
+        partner?.name?.let { partnerName ->
+            SectionCard(title = "Your partner") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TintedIcon(
+                        icon = Icons.Outlined.Storefront,
+                        container = MaterialTheme.colorScheme.secondaryContainer,
+                        content = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(partnerName, style = MaterialTheme.typography.titleMedium)
+                        partner.phone?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // ---- Referral code ----
         SectionCard(title = "Referral code") {
             OutlinedTextField(
                 value = state.referralCode,
                 onValueChange = vm::setReferralCode,
-                label = { Text("Dealer code (optional)") },
+                label = { Text("Partner code (optional)") },
                 singleLine = true,
                 supportingText = {
                     when {
@@ -248,7 +281,7 @@ private fun FormContent(vm: CheckoutViewModel, state: CheckoutUiState, modifier:
                             color = MaterialTheme.colorScheme.primary,
                         )
                         state.referralCode.isNotBlank() -> Text("Code not recognised.")
-                        else -> Text("Orders through a dealer are discounted.")
+                        else -> Text("Orders through a partner are discounted.")
                     }
                 },
                 trailingIcon = {
@@ -418,6 +451,7 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         ),
         shape = RoundedCornerShape(16.dp),
+        border = cardBorder(),
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)

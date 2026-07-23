@@ -69,6 +69,7 @@ import com.example.sanathanatattva.data.cart.totals
 import com.example.sanathanatattva.imageUrl
 import com.example.sanathanatattva.ui.appContainer
 import com.example.sanathanatattva.ui.components.EmptyState
+import com.example.sanathanatattva.ui.components.cardBorder
 import com.example.sanathanatattva.ui.components.rememberReducedMotion
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
@@ -223,6 +224,7 @@ private fun PriceDetailsCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         ),
+        border = cardBorder(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
@@ -328,6 +330,7 @@ private fun CartLineCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         ),
+        border = cardBorder(),
     ) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

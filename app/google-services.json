@@ -59,6 +59,14 @@
           }
         },
         {
+          "client_id": "297106911662-l0f31a8aglmo6qvkvngpdjjtfsktcr3k.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sanathanatattva.app",
+            "certificate_hash": "1f358b5113c9cc34660feb0e6fd25a833c90e112"
+          }
+        },
+        {
           "client_id": "297106911662-m3qq3rc7v7osiclbg4n8irmrhbebqrgp.apps.googleusercontent.com",
           "client_type": 3
         }

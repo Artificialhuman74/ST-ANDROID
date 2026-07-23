@@ -1,5 +1,6 @@
 package com.example.sanathanatattva.ui.screens.account
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -53,6 +55,8 @@ import com.example.sanathanatattva.ui.appContainer
 import com.example.sanathanatattva.ui.components.EmptyState
 import com.example.sanathanatattva.ui.components.ErrorState
 import com.example.sanathanatattva.ui.components.SkeletonBlock
+import com.example.sanathanatattva.ui.components.TintedIcon
+import com.example.sanathanatattva.ui.components.cardBorder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
@@ -185,9 +189,17 @@ fun AddressesScreen(navController: NavController) {
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                         ),
+                        border = cardBorder(),
                     ) {
                         val updating = address.id in state.updatingIds
-                        Column(Modifier.padding(16.dp)) {
+                        Row(Modifier.padding(16.dp)) {
+                            TintedIcon(
+                                icon = Icons.Outlined.Place,
+                                container = MaterialTheme.colorScheme.primaryContainer,
+                                content = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     address.label,
@@ -201,7 +213,13 @@ fun AddressesScreen(navController: NavController) {
                                     Text(
                                         "Default",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier
+                                            .background(
+                                                MaterialTheme.colorScheme.primaryContainer,
+                                                RoundedCornerShape(8.dp),
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 3.dp),
                                     )
                                 }
                             }
@@ -235,6 +253,7 @@ fun AddressesScreen(navController: NavController) {
                                     Text("Delete", color = MaterialTheme.colorScheme.error)
                                 }
                             }
+                        }
                         }
                     }
                 }

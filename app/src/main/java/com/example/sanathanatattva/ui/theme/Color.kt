@@ -21,7 +21,10 @@ val Gold900 = Color(0xFF4E2E0F)
 // Green-tinted neutrals
 val Ink = Color(0xFF1A1C1A)
 val InkMuted = Color(0xFF404943)
-val Mist = Color(0xFFF9FAF6)       // app background
+// App background: a bright, all-but-white ground with the faintest green
+// whisper. Cards separate from it by their warm creamy tint, not by darkening
+// the whole page (see surfaceContainerLowest in Theme.kt).
+val Mist = Color(0xFFFBFDF8)       // app background
 val SurfaceBright = Color(0xFFFDFDFA)
 val SurfaceDim = Color(0xFFE0E4DC)
 val OutlineGreen = Color(0xFF707973)

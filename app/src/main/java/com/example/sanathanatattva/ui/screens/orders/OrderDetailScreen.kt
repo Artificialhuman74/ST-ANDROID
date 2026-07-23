@@ -50,6 +50,7 @@ import coil.request.ImageRequest
 import com.example.sanathanatattva.imageUrl
 import com.example.sanathanatattva.ui.appContainer
 import com.example.sanathanatattva.ui.components.ErrorState
+import com.example.sanathanatattva.ui.components.cardBorder
 import com.example.sanathanatattva.ui.components.SkeletonBlock
 import com.example.sanathanatattva.util.formatRupees
 
@@ -112,6 +113,7 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                     ),
+                    border = cardBorder(),
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -150,6 +152,7 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                         ),
+                        border = cardBorder(),
                     ) {
                         Row(
                             Modifier.padding(16.dp),
@@ -185,6 +188,7 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                     ),
+                    border = cardBorder(),
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         Text("Items", style = MaterialTheme.typography.titleMedium)
@@ -227,12 +231,17 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
                         }
                         HorizontalDivider(Modifier.padding(vertical = 8.dp))
                         BreakdownRow("Subtotal (incl. GST)", order.subtotal)
+                        // Discount, deposits and store credit are money moments → ledger gold.
                         if (order.discount_amount > 0)
-                            BreakdownRow("Discount (${order.discount_percent.toInt()}%)", -order.discount_amount)
+                            BreakdownRow(
+                                "Discount (${order.discount_percent.toInt()}%)",
+                                -order.discount_amount,
+                                highlight = true,
+                            )
                         if (order.container_costs_total > 0)
-                            BreakdownRow("Container deposits", order.container_costs_total)
+                            BreakdownRow("Container deposits", order.container_costs_total, highlight = true)
                         if (order.store_credit_applied > 0)
-                            BreakdownRow("Store credit", -order.store_credit_applied)
+                            BreakdownRow("Store credit", -order.store_credit_applied, highlight = true)
                         HorizontalDivider(Modifier.padding(vertical = 8.dp))
                         Row {
                             Text("Paid", style = MaterialTheme.typography.titleMedium)
@@ -248,6 +257,7 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                         ),
+                        border = cardBorder(),
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Text("Delivery address", style = MaterialTheme.typography.titleMedium)
@@ -313,7 +323,7 @@ private fun TimelineRow(label: String, done: Boolean, current: Boolean, last: Bo
 }
 
 @Composable
-private fun BreakdownRow(label: String, amount: Double) {
+private fun BreakdownRow(label: String, amount: Double, highlight: Boolean = false) {
     Row(Modifier.padding(vertical = 2.dp)) {
         Text(
             label,
@@ -324,6 +334,8 @@ private fun BreakdownRow(label: String, amount: Double) {
         Text(
             (if (amount < 0) "− " else "") + formatRupees(kotlin.math.abs(amount)),
             style = MaterialTheme.typography.bodyMedium,
+            color = if (highlight) MaterialTheme.colorScheme.tertiary
+            else MaterialTheme.colorScheme.onSurface,
         )
     }
 }

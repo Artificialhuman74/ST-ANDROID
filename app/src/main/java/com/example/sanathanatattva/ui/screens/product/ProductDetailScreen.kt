@@ -127,8 +127,7 @@ fun ProductDetailScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(260.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainer),
+                                .clip(RoundedCornerShape(16.dp)),
                         )
                     }
                     if (images.size > 1) {

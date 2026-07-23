@@ -39,6 +39,8 @@ import com.example.sanathanatattva.ui.components.DockContentClearance
 import com.example.sanathanatattva.ui.components.EmptyState
 import com.example.sanathanatattva.ui.components.ErrorState
 import com.example.sanathanatattva.ui.components.SkeletonBlock
+import com.example.sanathanatattva.ui.components.TintedIcon
+import com.example.sanathanatattva.ui.components.cardBorder
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
 import com.example.sanathanatattva.util.formatRupees
@@ -134,36 +136,45 @@ private fun OrderCard(order: Order, onClick: () -> Unit) {
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         ),
+        border = cardBorder(),
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    order.order_number,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Spacer(Modifier.weight(1f))
-                StatusChip(order.status)
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                order.items.joinToString { "${it.quantity} × ${it.product_name}" }
-                    .ifBlank { "${order.item_count} items" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+        Row(Modifier.padding(16.dp)) {
+            TintedIcon(
+                icon = Icons.Outlined.ReceiptLong,
+                size = 44.dp,
+                iconSize = 24.dp,
             )
-            Spacer(Modifier.height(6.dp))
-            Row {
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        order.order_number,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.weight(1f))
+                    StatusChip(order.status)
+                }
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    order.created_at.take(10),
+                    order.items.joinToString { "${it.quantity} × ${it.product_name}" }
+                        .ifBlank { "${order.item_count} items" },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
                 )
-                Spacer(Modifier.weight(1f))
-                Text(formatRupees(order.total_amount), style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(6.dp))
+                Row {
+                    Text(
+                        order.created_at.take(10),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(formatRupees(order.total_amount), style = MaterialTheme.typography.titleSmall)
+                }
             }
         }
     }
@@ -171,11 +182,19 @@ private fun OrderCard(order: Order, onClick: () -> Unit) {
 
 @Composable
 fun StatusChip(status: String) {
+    // Colour tracks the order's journey; the text label always carries the
+    // meaning too, so colour is never the only signal.
     val (bg, fg) = when (status) {
+        // Arrived — brand green, the "done well" colour.
         "delivered" -> MaterialTheme.colorScheme.primaryContainer to
             MaterialTheme.colorScheme.onPrimaryContainer
+        // Stopped — error red.
         "cancelled" -> MaterialTheme.colorScheme.errorContainer to
             MaterialTheme.colorScheme.onErrorContainer
+        // Not started yet — a quiet neutral.
+        "pending", "confirmed" -> MaterialTheme.colorScheme.surfaceContainerHighest to
+            MaterialTheme.colorScheme.onSurfaceVariant
+        // On its way — sage, active but calm.
         else -> MaterialTheme.colorScheme.secondaryContainer to
             MaterialTheme.colorScheme.onSecondaryContainer
     }
@@ -185,6 +204,6 @@ fun StatusChip(status: String) {
         color = fg,
         modifier = Modifier
             .background(bg, RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
     )
 }

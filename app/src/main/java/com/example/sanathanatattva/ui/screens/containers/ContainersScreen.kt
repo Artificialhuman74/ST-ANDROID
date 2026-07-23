@@ -1,6 +1,8 @@
 package com.example.sanathanatattva.ui.screens.containers
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -22,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -51,6 +54,9 @@ import com.example.sanathanatattva.ui.components.DockContentClearance
 import com.example.sanathanatattva.ui.components.EmptyState
 import com.example.sanathanatattva.ui.components.ErrorState
 import com.example.sanathanatattva.ui.components.SkeletonBlock
+import com.example.sanathanatattva.ui.components.TintedIcon
+import com.example.sanathanatattva.ui.components.cardBorder
+import com.example.sanathanatattva.ui.components.TopSnackbarHost
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
 import com.example.sanathanatattva.util.formatRupees
@@ -92,8 +98,8 @@ fun ContainersScreen(navController: NavController, session: SessionViewModel) {
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Your containers") }) },
-        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        Box(Modifier.fillMaxSize()) {
         when {
             isLoggedIn == false -> EmptyState(
                 icon = Icons.Outlined.Inventory2,
@@ -162,6 +168,15 @@ fun ContainersScreen(navController: NavController, session: SessionViewModel) {
                 }
             }
         }
+
+            // In-app notifications drop in from the top, not the bottom.
+            TopSnackbarHost(
+                hostState = snackbar,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = padding.calculateTopPadding()),
+            )
+        }
     }
 
     // Welcome story: shown exactly once, first time any user opens this tab.
@@ -222,9 +237,16 @@ private fun HoldingCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         ),
+        border = cardBorder(),
     ) {
         Column(Modifier.padding(16.dp)) {
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TintedIcon(
+                    icon = Icons.Outlined.Inventory2,
+                    container = MaterialTheme.colorScheme.primaryContainer,
+                    content = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         holding.current_product_name ?: "Container",
@@ -239,6 +261,7 @@ private fun HoldingCard(
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
+                    // Deposit is a money moment → ledger gold.
                     Text(
                         formatRupees(holding.deposit_amount),
                         style = MaterialTheme.typography.titleSmall,
@@ -251,15 +274,22 @@ private fun HoldingCard(
                     )
                 }
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(10.dp))
+            val (statusBg, statusFg) = when (holding.status) {
+                "held" -> MaterialTheme.colorScheme.primaryContainer to
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                "forfeited" -> MaterialTheme.colorScheme.errorContainer to
+                    MaterialTheme.colorScheme.onErrorContainer
+                else -> MaterialTheme.colorScheme.secondaryContainer to
+                    MaterialTheme.colorScheme.onSecondaryContainer
+            }
             Text(
                 holdingStatusLabel(holding.status),
-                style = MaterialTheme.typography.labelLarge,
-                color = when (holding.status) {
-                    "held" -> MaterialTheme.colorScheme.primary
-                    "forfeited" -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
+                style = MaterialTheme.typography.labelMedium,
+                color = statusFg,
+                modifier = Modifier
+                    .background(statusBg, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
             )
 
             when (holding.status) {

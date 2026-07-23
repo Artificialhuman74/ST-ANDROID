@@ -19,9 +19,8 @@ import com.example.sanathanatattva.data.model.GoogleAuthRequest
 import com.example.sanathanatattva.data.model.LoginRequest
 import com.example.sanathanatattva.data.model.RegisterRequest
 import com.example.sanathanatattva.data.model.ResendVerificationRequest
-import com.example.sanathanatattva.data.model.SendEmailOtpRequest
 import com.example.sanathanatattva.data.model.VerifyOtpRequest
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
@@ -35,8 +34,6 @@ data class AuthUiState(
     val loading: Boolean = false,
     val error: String? = null,
     val info: String? = null,
-    /** True once a login code has been emailed; the screen shows the OTP entry. */
-    val emailOtpSent: Boolean = false,
     /** Dealer name when a referral code validates, null otherwise. */
     val referralDealerName: String? = null,
     val referralChecking: Boolean = false,
@@ -115,55 +112,6 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    /** Passwordless login, step 1: email a one-time code. */
-    fun sendEmailOtp(email: String) {
-        val e = email.trim()
-        if (!e.contains("@") || !e.contains(".") || e.length < 6) {
-            state.value = state.value.copy(error = "Enter a valid email address.")
-            return
-        }
-        state.value = state.value.copy(loading = true, error = null)
-        viewModelScope.launch {
-            apiCall { container.api.sendEmailOtp(SendEmailOtpRequest(e)) }
-                .onSuccess {
-                    state.value = state.value.copy(
-                        loading = false,
-                        emailOtpSent = true,
-                        info = "Code sent. Check your inbox and spam folder.",
-                    )
-                }
-                .onFailure { err ->
-                    state.value = state.value.copy(loading = false, error = err.message)
-                }
-        }
-    }
-
-    /** Passwordless login, step 2: exchange the emailed code for a session. */
-    fun verifyEmailLoginOtp(email: String, otp: String) {
-        if (otp.length != 6) {
-            state.value = state.value.copy(error = "Enter the 6-digit code from your email.")
-            return
-        }
-        state.value = state.value.copy(loading = true, error = null)
-        viewModelScope.launch {
-            apiCall { container.api.verifyEmailOtp(VerifyOtpRequest(email.trim(), otp.trim())) }
-                .onSuccess { res ->
-                    state.value = state.value.copy(loading = false)
-                    val token = res.token
-                    if (token != null) outcome.value = AuthOutcome.LoggedIn(token, res.consumer)
-                    else state.value = state.value.copy(error = "Unexpected response from the server.")
-                }
-                .onFailure { e ->
-                    state.value = state.value.copy(loading = false, error = e.message)
-                }
-        }
-    }
-
-    /** Back out of the OTP entry (change email / switch method). */
-    fun resetEmailOtp() {
-        state.value = state.value.copy(emailOtpSent = false, error = null, info = null)
-    }
-
     fun verifyOtp(email: String, otp: String) {
         if (otp.length != 6) {
             state.value = state.value.copy(error = "Enter the 6-digit code from your email.")
@@ -228,12 +176,15 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             try {
                 val credentialManager = CredentialManager.create(context)
-                val googleIdOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
+                // GetSignInWithGoogleOption drives the explicit "Sign in with Google"
+                // account-picker flow. Unlike GetGoogleIdOption (the One Tap bottom
+                // sheet), it always surfaces the picker instead of throwing
+                // NoCredentialException when there's no already-authorized account.
+                val googleIdOption = GetSignInWithGoogleOption.Builder(
                     // The Firebase project's web client (generated from google-services.json),
                     // so the resulting Google token can be exchanged for a Firebase token below.
-                    .setServerClientId(context.getString(R.string.default_web_client_id))
-                    .build()
+                    serverClientId = context.getString(R.string.default_web_client_id),
+                ).build()
                 val request = GetCredentialRequest.Builder()
                     .addCredentialOption(googleIdOption)
                     .build()
@@ -276,10 +227,14 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
             } catch (e: GetCredentialCancellationException) {
                 state.value = state.value.copy(loading = false)
             } catch (e: NoCredentialException) {
+                // With the account-picker flow this is rare; when it does fire on a
+                // device that has Google accounts, the usual cause is a signing-cert
+                // (SHA-1/SHA-256) fingerprint that isn't registered on the Firebase /
+                // Google Cloud OAuth client — e.g. the Play App Signing certificate.
                 Log.e("GoogleAuth", "NoCredentialException: ${e.message}", e)
                 state.value = state.value.copy(
                     loading = false,
-                    error = "No Google account found on this device. Add a Google account in Settings and try again.",
+                    error = "Google sign-in isn't available right now. Please log in with your email and password.",
                 )
             } catch (e: GetCredentialException) {
                 Log.e("GoogleAuth", "${e::class.simpleName} type=${e.type} msg=${e.message}", e)

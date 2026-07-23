@@ -60,6 +60,12 @@ data class Consumer(
     val email_verified: Int = 0,
     val linked_dealer_id: Long? = null,
     val referral_code_used: String? = null,
+    // Auth methods the account has. The backend derives these from the presence
+    // of a password / linked Google account and never sends the credentials.
+    // Default has_password = true so email accounts keep their controls if an
+    // older backend omits the field; has_google defaults false.
+    val has_password: Boolean = true,
+    val has_google: Boolean = false,
     val dealer: LinkedDealer? = null,
     val parentDealer: LinkedDealer? = null,
 )

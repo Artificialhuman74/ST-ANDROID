@@ -105,7 +105,8 @@ import kotlinx.coroutines.delay
 
 // ---------------------------------------------------------------------------
 // Onboarding / sign-in landing: a drenched brand hero, a glass method slider
-// (Email | Phone), passwordless email OTP as the primary path, Google below.
+// (Email | Phone), email + password sign-in, Google below. (Passwordless email
+// OTP and phone OTP are not live on the backend yet.)
 // ---------------------------------------------------------------------------
 
 private const val TAB_EMAIL = 0
@@ -420,142 +421,51 @@ private fun EmailPane(
     email: String,
     onEmailChange: (String) -> Unit,
 ) {
-    var usePassword by rememberSaveable { mutableStateOf(false) }
     var password by rememberSaveable { mutableStateOf("") }
     var showPassword by rememberSaveable { mutableStateOf(false) }
-    var otp by rememberSaveable { mutableStateOf("") }
 
+    // Passwordless email OTP login isn't implemented on the backend yet (the
+    // send-otp/verify-otp endpoints 404), so email login is password-based.
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        if (state.emailOtpSent) {
-            // --- OTP entry stage ---
-            Text(
-                "Enter the code",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "We emailed a 6-digit code to $email.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(20.dp))
-            OtpInput(
-                value = otp,
-                onValueChange = { otp = it; vm.clearMessages() },
-                enabled = !state.loading,
-            )
-            LaunchedEffect(otp) {
-                if (otp.length == 6) vm.verifyEmailLoginOtp(email, otp)
-            }
-            if (state.loading) {
-                Spacer(Modifier.height(16.dp))
-                CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-            }
-            state.info?.let {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    textAlign = TextAlign.Center,
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            ResendCountdown(
-                loading = state.loading,
-                onResend = { vm.sendEmailOtp(email) },
-            )
-            TextButton(onClick = { otp = ""; vm.resetEmailOtp() }) {
-                Text("Use a different email")
-            }
-        } else if (!usePassword) {
-            // --- OTP request stage ---
-            OutlinedTextField(
-                value = email,
-                onValueChange = onEmailChange,
-                label = { Text("Email") },
-                singleLine = true,
-                enabled = !state.loading,
-                shape = RoundedCornerShape(16.dp),
-                colors = softFieldColors(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(18.dp))
-            PrimaryActionButton(
-                text = "Email me a code",
-                loading = state.loading,
-                onClick = { vm.sendEmailOtp(email) },
-            )
-            TextButton(onClick = { usePassword = true; vm.clearMessages() }) {
-                Text("Log in with a password instead")
-            }
-        } else {
-            // --- Password fallback ---
-            OutlinedTextField(
-                value = email,
-                onValueChange = onEmailChange,
-                label = { Text("Email") },
-                singleLine = true,
-                enabled = !state.loading,
-                shape = RoundedCornerShape(16.dp),
-                colors = softFieldColors(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it; vm.clearMessages() },
-                label = { Text("Password") },
-                singleLine = true,
-                enabled = !state.loading,
-                shape = RoundedCornerShape(16.dp),
-                colors = softFieldColors(),
-                visualTransformation = if (showPassword) VisualTransformation.None
-                else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    IconButton(onClick = { showPassword = !showPassword }) {
-                        Icon(
-                            if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = if (showPassword) "Hide password" else "Show password",
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(18.dp))
-            PrimaryActionButton(
-                text = "Log in",
-                loading = state.loading,
-                onClick = { vm.login(email, password) },
-            )
-            TextButton(onClick = { usePassword = false; vm.clearMessages() }) {
-                Text("Email me a code instead")
-            }
-        }
-    }
-}
-
-/** Resend link with a 30-second cooldown. */
-@Composable
-private fun ResendCountdown(loading: Boolean, onResend: () -> Unit) {
-    var resendKey by rememberSaveable { mutableIntStateOf(0) }
-    var seconds by remember(resendKey) { mutableIntStateOf(30) }
-    LaunchedEffect(resendKey) {
-        while (seconds > 0) {
-            delay(1000)
-            seconds--
-        }
-    }
-    TextButton(
-        enabled = seconds == 0 && !loading,
-        onClick = { onResend(); resendKey++ },
-    ) {
-        Text(if (seconds > 0) "Resend code in ${seconds}s" else "Resend code")
+        OutlinedTextField(
+            value = email,
+            onValueChange = onEmailChange,
+            label = { Text("Email") },
+            singleLine = true,
+            enabled = !state.loading,
+            shape = RoundedCornerShape(16.dp),
+            colors = softFieldColors(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it; vm.clearMessages() },
+            label = { Text("Password") },
+            singleLine = true,
+            enabled = !state.loading,
+            shape = RoundedCornerShape(16.dp),
+            colors = softFieldColors(),
+            visualTransformation = if (showPassword) VisualTransformation.None
+            else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                IconButton(onClick = { showPassword = !showPassword }) {
+                    Icon(
+                        if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        contentDescription = if (showPassword) "Hide password" else "Show password",
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(18.dp))
+        PrimaryActionButton(
+            text = "Log in",
+            loading = state.loading,
+            onClick = { vm.login(email, password) },
+        )
     }
 }
 
@@ -661,59 +571,6 @@ private fun softFieldColors(): TextFieldColors = OutlinedTextFieldDefaults.color
     focusedBorderColor = MaterialTheme.colorScheme.primary,
     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
 )
-
-/** Six-box one-time-code entry backed by a single invisible text field. */
-@Composable
-private fun OtpInput(
-    value: String,
-    onValueChange: (String) -> Unit,
-    enabled: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val focusRequester = remember { FocusRequester() }
-    var focused by remember { mutableStateOf(false) }
-
-    BasicTextField(
-        value = value,
-        onValueChange = { new -> onValueChange(new.filter(Char::isDigit).take(6)) },
-        enabled = enabled,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = modifier
-            .focusRequester(focusRequester)
-            .onFocusChanged { focused = it.isFocused },
-        decorationBox = { innerTextField ->
-            Box {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    repeat(6) { i ->
-                        val active = focused && i == value.length.coerceAtMost(5)
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(width = 46.dp, height = 56.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                                .border(
-                                    width = if (active) 2.dp else 1.dp,
-                                    color = if (active) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outlineVariant,
-                                    shape = RoundedCornerShape(14.dp),
-                                ),
-                        ) {
-                            Text(
-                                value.getOrNull(i)?.toString() ?: "",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                }
-                // The real field stays invisible; the boxes above render its value.
-                Box(Modifier.matchParentSize().alpha(0f)) { innerTextField() }
-            }
-        },
-    )
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-}
 
 @Composable
 fun GoogleSignInButton(loading: Boolean, onClick: () -> Unit) {

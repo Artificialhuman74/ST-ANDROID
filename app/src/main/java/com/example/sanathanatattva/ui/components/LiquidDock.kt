@@ -37,8 +37,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -118,14 +121,28 @@ fun LiquidDock(
         }
     }
 
+    // Lift the floating dock off the ground. In light mode a soft neutral drop
+    // shadow does it; on the true-black dark theme a black shadow is invisible,
+    // so the dock casts a subtle brand-green glow instead — a bigger, softer
+    // spread that reads as separation without a hard edge.
+    val scheme = MaterialTheme.colorScheme
+    val onDarkGround = scheme.surface.luminance() < 0.5f
+    val dockShape = RoundedCornerShape(28.dp)
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        shadowElevation = 8.dp,
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .shadow(
+                elevation = if (onDarkGround) 22.dp else 8.dp,
+                shape = dockShape,
+                clip = false,
+                ambientColor = if (onDarkGround) scheme.primary.copy(alpha = 0.55f) else Color.Black,
+                spotColor = if (onDarkGround) scheme.primary.copy(alpha = 0.70f) else Color.Black,
+            ),
+        shape = dockShape,
+        color = scheme.surfaceContainerLowest,
+        shadowElevation = 0.dp,
     ) {
         BoxWithConstraints(
             Modifier

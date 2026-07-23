@@ -167,11 +167,7 @@ class CheckoutViewModel(private val container: AppContainer) : ViewModel() {
                     }
 
                     is PaymentEvent.Failure -> {
-                        failPayment(
-                            event.description?.takeIf { it.isNotBlank() }
-                                ?.let { "Payment didn't go through: $it" }
-                                ?: "Payment didn't go through. Your cart is untouched; you can try again."
-                        )
+                        failPayment(humanizePaymentError(event.description))
                     }
                 }
             }
@@ -347,6 +343,32 @@ class CheckoutViewModel(private val container: AppContainer) : ViewModel() {
             .onFailure { e ->
                 failPayment("Couldn't start the payment: ${e.message}")
             }
+    }
+
+    /**
+     * Turn Razorpay's failure payload into something a customer can read.
+     * The SDK often hands back a raw JSON error blob (or a useless "undefined"),
+     * which must never be shown as-is. Prefer a real message parsed out of it;
+     * otherwise fall back to a calm, reassuring line.
+     */
+    private fun humanizePaymentError(raw: String?): String {
+        val generic =
+            "Payment didn't go through — your cart is untouched. Please try again, " +
+                "or use a different payment method."
+        val text = raw?.trim().orEmpty()
+        if (text.isEmpty()) return generic
+
+        // A plain sentence from the SDK is safe to surface directly.
+        if (!text.startsWith("{")) return "Payment didn't go through: $text"
+
+        // A JSON error blob: pull out a genuine description if there is one.
+        val desc = runCatching {
+            org.json.JSONObject(text)
+                .optJSONObject("error")
+                ?.optString("description")
+                ?.takeIf { it.isNotBlank() && !it.equals("undefined", true) && !it.equals("null", true) }
+        }.getOrNull()
+        return if (desc != null) "Payment didn't go through: $desc" else generic
     }
 
     /** Called when the user backs out of the Razorpay sheet without paying. */

@@ -14,7 +14,7 @@ colors:
   on-gold-container: "#4E2E0F"
   ink: "#1A1C1A"
   ink-muted: "#404943"
-  mist: "#F9FAF6"
+  mist: "#FBFDF8"
   surface-bright: "#FDFDFA"
   surface-dim: "#E0E4DC"
   outline-green: "#707973"
@@ -87,12 +87,12 @@ components:
 
 **Creative North Star: "The Specialty Storefront"**
 
-A calm, curated shop — not a marketplace. Few products per view, imagery leads, and the shelf never shouts. The system is built for households reordering staples in bright kitchens: a light-only, green-tinted world where hierarchy comes from type weight and tonal surfaces, never from noise. Every screen behaves like a well-kept storefront: the goods are the color, the chrome recedes, and money is the one thing the interface is never casual about.
+A calm, curated shop — not a marketplace. Few products per view, imagery leads, and the shelf never shouts. The system is built for households reordering staples in bright kitchens: a green-tinted world where hierarchy comes from type weight and tonal surfaces, never from noise. Every screen behaves like a well-kept storefront: the goods are the color, the chrome recedes, and money is the one thing the interface is never casual about.
 
 The system explicitly rejects cold marketplace density (Amazon-style badge clutter), urgency mechanics of any kind, and eco-cliché decoration. The brand green carries the identity on its own; it needs no leaf icons or textures.
 
 **Key Characteristics:**
-- Light-only theme on a green-tinted near-white (`mist`), designed for bright ambient light
+- Light and dark themes that follow the device setting. Light rests on a green-tinted paper (`mist`); dark is true-black (OLED) with dark neutral cards lifting off it, and a fresher, more vivid grass green as the accent. Gold stays money-only in both
 - Restrained color strategy: brand green ≤10% of any screen, on actions and selection only
 - Gold appears exclusively at money moments — wallet, deposits, cashback, discounts
 - One type family (Roboto), weight-driven hierarchy, 16sp body floor
@@ -116,7 +116,7 @@ A green-anchored restrained palette on green-tinted neutrals, with gold as a sin
 ### Neutral
 - **Ink** (#1A1C1A): primary text on all light surfaces.
 - **Ink Muted** (#404943): secondary text; still passes 4.5:1 on `mist` and `surface-bright`.
-- **Mist** (#F9FAF6): the app background — a green-tinted near-white, not cream.
+- **Mist** (#FBFDF8): the app background — a bright, all-but-white ground with the faintest green whisper. Cards are crisp white (`surfaceContainerLowest`) defined against it by a **hairline outline** (`outlineVariant`), not by any fill tint. The outline is centralized in `ui/components/Accents.kt` — `cardBorder()` with a single `CardOutlineWidth` knob — so every card is consistent and the treatment is tuned from one place. Works in light and dark (the colour is a theme token).
 - **Surface Bright** (#FDFDFA): cards and raised content surfaces.
 - **Surface Dim** (#E0E4DC) and the container ramp (#F3F5F0 → #E1E5DF): tonal layering steps.
 - **Outline Green** (#707973) / **Outline Faint** (#C0C9C1): borders and dividers.
@@ -202,4 +202,4 @@ The component voice is **refined and reassuring**: generous rounding (12–16dp)
 - **Don't** add eco-cliché decoration: no scattered leaf icons, kraft-paper textures, or greenwashing copy. The palette carries the brand.
 - **Don't** put gold on anything that isn't money, or use color as the only signal for a state.
 - **Don't** give resting cards shadows above 1dp, nest cards, or invent non-standard controls for standard tasks.
-- **Don't** introduce a second type family or a dark theme (light-only is a deliberate v1 decision for bright-kitchen use).
+- **Don't** introduce a second type family. Both light and dark themes are supported and follow the device setting; keep the green identity and the gold-means-money rule consistent across both.

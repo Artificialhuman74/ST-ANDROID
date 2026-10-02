@@ -18,7 +18,8 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Storefront
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -100,7 +101,8 @@ fun AppRoot() {
     // The splash plays once per launch — not again on rotation or a theme change.
     var showSplash by rememberSaveable { mutableStateOf(true) }
 
-    Scaffold { _ ->
+    // Each screen owns its scaffold and insets; the root supplies only the background.
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         // Tab peers: near-instant fade (no slide — slides imply hierarchy, tabs are peers).
         // Push destinations: light horizontal slide + fade. Exit accelerates, enter decelerates.
         val tabFadeIn = fadeIn(tween(100))

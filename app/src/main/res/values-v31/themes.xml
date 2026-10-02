@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Android 12+ draws its own splash from these: the same press-green ground and
+         no icon, so frame 0 of the in-app brand splash matches it exactly. -->
+    <style name="Theme.SanathanaTattva.Starting">
+        <item name="android:windowBackground">@color/splash_ground</item>
+        <item name="android:statusBarColor">@color/splash_ground</item>
+        <item name="android:navigationBarColor">@color/splash_ground</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_ground</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
+    </style>
+</resources>

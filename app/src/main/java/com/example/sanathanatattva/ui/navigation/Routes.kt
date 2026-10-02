@@ -14,6 +14,7 @@ object Routes {
     const val ORDER_DETAIL = "order/{orderId}"
     const val ADDRESSES = "addresses"
     const val WALLET = "wallet"
+    const val LUCKY_DRAW = "lucky_draw"
 
     // Auth
     const val LOGIN = "login"

@@ -12,6 +12,31 @@ import retrofit2.http.Query
 
 interface ApiService {
 
+    // ---- Bhagya Chakra (uses the same consumer account as the web app) ----
+    @GET("api/lucky-draw/consumer/status")
+    suspend fun luckyDrawStatus(): LuckyDrawStatus
+
+    @GET("api/lucky-draw/consumer/welcome-gifts")
+    suspend fun luckyDrawGifts(): WelcomeGiftsResponse
+
+    @GET("api/lucky-draw/consumer/recent-winners")
+    suspend fun luckyDrawWinners(): DrawWinnersResponse
+
+    @POST("api/lucky-draw/consumer/enroll")
+    suspend fun enrollLuckyDraw(@Body body: EnrollDrawRequest): EnrollDrawResponse
+
+    @POST("api/lucky-draw/consumer/enroll/verify")
+    suspend fun verifyLuckyDraw(@Body body: VerifyDrawRequest): DrawActionResponse
+
+    @POST("api/lucky-draw/consumer/reward-order")
+    suspend fun claimLuckyDrawReward(): DrawActionResponse
+
+    @POST("api/lucky-draw/consumer/leave")
+    suspend fun leaveLuckyDraw(): DrawActionResponse
+
+    @POST("api/consumer/link-dealer")
+    suspend fun linkDealer(@Body body: LinkDealerRequest): SuccessResponse
+
     // ---- Auth ----
     @POST("api/auth/consumer/register")
     suspend fun register(@Body body: RegisterRequest): RegisterResponse

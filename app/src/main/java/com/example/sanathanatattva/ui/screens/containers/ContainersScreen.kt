@@ -58,6 +58,7 @@ import com.example.sanathanatattva.ui.components.TintedIcon
 import com.example.sanathanatattva.ui.components.cardBorder
 import com.example.sanathanatattva.ui.components.TopSnackbarHost
 import com.example.sanathanatattva.ui.navigation.Routes
+import com.example.sanathanatattva.ui.navigation.openTab
 import com.example.sanathanatattva.ui.session.SessionViewModel
 import com.example.sanathanatattva.util.formatRupees
 
@@ -138,7 +139,7 @@ fun ContainersScreen(navController: NavController, session: SessionViewModel) {
                             "Return it any time and the deposit comes back to you.",
                         actionLabel = if (tab == 0) "Browse the shop" else null,
                         onAction = if (tab == 0) {
-                            { navController.navigate(Routes.SHOP) }
+                            { navController.openTab(Routes.SHOP) }
                         } else null,
                     )
                 } else {
@@ -161,6 +162,8 @@ fun ContainersScreen(navController: NavController, session: SessionViewModel) {
                                     onCancelRefund = { vm.cancelRefund(holding.id) },
                                     onSwap = { swapTarget = holding },
                                     onDispute = { disputeTarget = holding },
+                                    onRewardRound = { navController.navigate(Routes.LUCKY_DRAW) },
+                                    rewardRoundActive = state.rewardRoundActive,
                                 )
                             }
                         }
@@ -232,6 +235,8 @@ private fun HoldingCard(
     onCancelRefund: () -> Unit,
     onSwap: () -> Unit,
     onDispute: () -> Unit,
+    onRewardRound: () -> Unit,
+    rewardRoundActive: Boolean?,
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -268,7 +273,7 @@ private fun HoldingCard(
                         color = MaterialTheme.colorScheme.tertiary,
                     )
                     Text(
-                        "deposit",
+                        if (holding.source == "lucky_draw_reward") "reward container" else "deposit",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -292,26 +297,41 @@ private fun HoldingCard(
                     .padding(horizontal = 10.dp, vertical = 5.dp),
             )
 
+            if (holding.source == "lucky_draw_reward") {
+                Spacer(Modifier.height(10.dp))
+                Text(if (rewardRoundActive == false) "Won with Bhagya Chakra. No deposit was charged for this container."
+                    else "Won with Bhagya Chakra. Manage your free refills and return this container from your round.",
+                    style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(onClick = onRewardRound, enabled = !actionInProgress) {
+                    Text("View rewards and returns")
+                }
+            }
+
             when (holding.status) {
                 "held" -> {
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onRequestRefund, enabled = !actionInProgress) {
-                            Text("Return for refund")
+                        if (holding.source != "lucky_draw_reward" || rewardRoundActive == false) {
+                            OutlinedButton(onClick = onRequestRefund, enabled = !actionInProgress) {
+                                Text(if (holding.source == "lucky_draw_reward") "Return container" else "Return for refund")
+                            }
                         }
-                        OutlinedButton(onClick = onSwap, enabled = !actionInProgress) { Text("Swap oil") }
+                        if (holding.source != "lucky_draw_reward") {
+                            OutlinedButton(onClick = onSwap, enabled = !actionInProgress) { Text("Swap oil") }
+                        }
                     }
                 }
 
                 "refund_requested" -> {
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "We'll arrange a pickup. The deposit is refunded after the container is collected.",
+                        if (holding.source == "lucky_draw_reward") "Your trader will collect this reward container."
+                        else "We'll arrange a pickup. The deposit is refunded after the container is collected.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(6.dp))
-                    OutlinedButton(onClick = onCancelRefund, enabled = !actionInProgress) {
+                    if (holding.source != "lucky_draw_reward") OutlinedButton(onClick = onCancelRefund, enabled = !actionInProgress) {
                         Text("Keep the container")
                     }
                 }
@@ -344,7 +364,8 @@ private fun RefundDialog(
         title = { Text("Return ${holding.container_type} container") },
         text = {
             Text(
-                "Your ${formatRupees(holding.deposit_amount)} deposit comes back to you. " +
+                if (holding.source == "lucky_draw_reward") "Your trader will collect this reward container. No deposit was charged, so no refund is due."
+                else "Your ${formatRupees(holding.deposit_amount)} deposit comes back to you. " +
                     "Store credit is instant and can be used on your next order. " +
                     "A bank refund is arranged manually and can take a few days."
             )
@@ -352,10 +373,10 @@ private fun RefundDialog(
         confirmButton = {
             Column {
                 Button(onClick = { onConfirm("store_credit") }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Refund as store credit")
+                    Text(if (holding.source == "lucky_draw_reward") "Request return" else "Refund as store credit")
                 }
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = { onConfirm("manual_bank") }, modifier = Modifier.fillMaxWidth()) {
+                if (holding.source != "lucky_draw_reward") OutlinedButton(onClick = { onConfirm("manual_bank") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Refund to my bank")
                 }
             }

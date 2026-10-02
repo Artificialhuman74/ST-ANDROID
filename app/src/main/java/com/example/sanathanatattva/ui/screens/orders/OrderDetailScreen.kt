@@ -53,6 +53,7 @@ import com.example.sanathanatattva.ui.components.ErrorState
 import com.example.sanathanatattva.ui.components.cardBorder
 import com.example.sanathanatattva.ui.components.SkeletonBlock
 import com.example.sanathanatattva.util.formatRupees
+import com.example.sanathanatattva.ui.screens.luckydraw.LuckyDrawOrderBadge
 
 private val PROGRESS_STEPS = listOf(
     "confirmed", "processing", "packed", "dispatched", "out_for_delivery", "delivered",
@@ -109,6 +110,7 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 // ---- Status timeline ----
+                LuckyDrawOrderBadge(order.order_number)
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,

@@ -74,9 +74,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -93,6 +96,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.sanathanatattva.R
 import com.example.sanathanatattva.ui.appContainer
+import com.example.sanathanatattva.ui.brand.SealMoment
+import com.example.sanathanatattva.ui.brand.SealOrigin
+import com.example.sanathanatattva.ui.brand.signInMoment
 import com.example.sanathanatattva.ui.components.rememberReducedMotion
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
@@ -112,8 +118,15 @@ import kotlinx.coroutines.delay
 private const val TAB_EMAIL = 0
 private const val TAB_PHONE = 1
 
+/** Which button started the sign-in — its pill becomes the celebration's drop. */
+private enum class SignInSource { Email, Google }
+
 @Composable
-fun LoginScreen(navController: NavController, session: SessionViewModel) {
+fun LoginScreen(
+    navController: NavController,
+    session: SessionViewModel,
+    celebrate: (SealMoment) -> Unit,
+) {
     val container = appContainer()
     val vm: AuthViewModel = viewModel { AuthViewModel(container) }
     val state by vm.state.collectAsState()
@@ -124,12 +137,38 @@ fun LoginScreen(navController: NavController, session: SessionViewModel) {
     var tab by rememberSaveable { mutableIntStateOf(TAB_EMAIL) }
     var email by rememberSaveable { mutableStateOf("") }
 
+    // Sign-in success plays "one drop seals it": the button that was pressed turns
+    // into a drop, the green covers the screen, and only then do we pop back.
+    var source by remember { mutableStateOf(SignInSource.Email) }
+    var emailButtonBounds by remember { mutableStateOf<Rect?>(null) }
+    var googleButtonBounds by remember { mutableStateOf<Rect?>(null) }
+    var celebrating by remember { mutableStateOf(false) }
+    val formAlpha by animateFloatAsState(
+        targetValue = if (celebrating) 0f else 1f,
+        animationSpec = tween(250),
+        label = "form-out",
+    )
+    val buttonFill = MaterialTheme.colorScheme.primary
+
     LaunchedEffect(outcome) {
         when (val o = outcome) {
             is AuthOutcome.LoggedIn -> {
                 session.onLoggedIn(o.token, o.consumer)
                 vm.consumeOutcome()
-                navController.popBackStack()
+                val origin = if (source == SignInSource.Google) googleButtonBounds else emailButtonBounds
+                if (origin == null) {
+                    navController.popBackStack()
+                } else {
+                    celebrating = true
+                    celebrate(
+                        signInMoment(
+                            origin = SealOrigin.Pill(origin, buttonFill),
+                            consumerName = o.consumer?.name,
+                            accountRoute = Routes.ACCOUNT,
+                            onCovered = { navController.popBackStack() },
+                        ),
+                    )
+                }
             }
             is AuthOutcome.NeedsVerification -> {
                 session.pendingVerificationEmail.value = o.email
@@ -151,7 +190,7 @@ fun LoginScreen(navController: NavController, session: SessionViewModel) {
     ) {
         // Hero + glass slider overlapping its bottom edge.
         Box(Modifier.fillMaxWidth()) {
-            HeroPanel()
+            HeroPanel(textAlpha = formAlpha)
             GlassTabSlider(
                 options = listOf("Email", "Phone"),
                 selected = tab,
@@ -165,7 +204,8 @@ fun LoginScreen(navController: NavController, session: SessionViewModel) {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 28.dp)
-                    .offset { IntOffset(0, 30.dp.roundToPx()) },
+                    .offset { IntOffset(0, 30.dp.roundToPx()) }
+                    .alpha(formAlpha),
             )
         }
         Spacer(Modifier.height(54.dp))
@@ -188,7 +228,8 @@ fun LoginScreen(navController: NavController, session: SessionViewModel) {
             label = "auth-pane",
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 24.dp)
+                .alpha(formAlpha),
         ) { page ->
             when (page) {
                 TAB_EMAIL -> EmailPane(
@@ -196,6 +237,10 @@ fun LoginScreen(navController: NavController, session: SessionViewModel) {
                     state = state,
                     email = email,
                     onEmailChange = { email = it; vm.clearMessages() },
+                    onSubmit = { source = SignInSource.Email },
+                    onSubmitPlaced = { emailButtonBounds = it },
+                    // The drop takes the button's place, so the button itself goes at once.
+                    hideSubmit = celebrating && source == SignInSource.Email,
                 )
                 else -> PhonePane(loading = state.loading)
             }
@@ -217,7 +262,8 @@ fun LoginScreen(navController: NavController, session: SessionViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 24.dp)
+                .alpha(formAlpha),
         ) {
             HorizontalDivider(Modifier.weight(1f))
             Text(
@@ -230,18 +276,34 @@ fun LoginScreen(navController: NavController, session: SessionViewModel) {
         }
         Spacer(Modifier.height(18.dp))
 
-        Box(Modifier.padding(horizontal = 24.dp)) {
+        Box(
+            Modifier
+                .padding(horizontal = 24.dp)
+                .alpha(formAlpha),
+        ) {
             GoogleSignInButton(
                 loading = state.loading,
-                onClick = { vm.signInWithGoogle(context) },
+                onClick = {
+                    source = SignInSource.Google
+                    vm.signInWithGoogle(context)
+                },
+                modifier = Modifier
+                    .onGloballyPositioned { googleButtonBounds = it.boundsInRoot() }
+                    .alpha(if (celebrating && source == SignInSource.Google) 0f else 1f),
             )
         }
 
         Spacer(Modifier.height(18.dp))
-        TextButton(onClick = { navController.navigate(Routes.REGISTER) }) {
+        TextButton(
+            onClick = { navController.navigate(Routes.REGISTER) },
+            modifier = Modifier.alpha(formAlpha),
+        ) {
             Text("New here? Create an account")
         }
-        TextButton(onClick = { navController.popBackStack() }) {
+        TextButton(
+            onClick = { navController.popBackStack() },
+            modifier = Modifier.alpha(formAlpha),
+        ) {
             Text(
                 "Continue browsing without an account",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -256,7 +318,7 @@ fun LoginScreen(navController: NavController, session: SessionViewModel) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun HeroPanel() {
+private fun HeroPanel(textAlpha: Float = 1f) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -287,7 +349,8 @@ private fun HeroPanel() {
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(top = 52.dp, bottom = 66.dp, start = 24.dp, end = 24.dp),
+                .padding(top = 52.dp, bottom = 66.dp, start = 24.dp, end = 24.dp)
+                .alpha(textAlpha),
         ) {
             Text(
                 "Welcome",
@@ -420,6 +483,9 @@ private fun EmailPane(
     state: AuthUiState,
     email: String,
     onEmailChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onSubmitPlaced: (Rect) -> Unit,
+    hideSubmit: Boolean,
 ) {
     var password by rememberSaveable { mutableStateOf("") }
     var showPassword by rememberSaveable { mutableStateOf(false) }
@@ -464,7 +530,13 @@ private fun EmailPane(
         PrimaryActionButton(
             text = "Log in",
             loading = state.loading,
-            onClick = { vm.login(email, password) },
+            onClick = {
+                onSubmit()
+                vm.login(email, password)
+            },
+            modifier = Modifier
+                .onGloballyPositioned { onSubmitPlaced(it.boundsInRoot()) }
+                .alpha(if (hideSubmit) 0f else 1f),
         )
     }
 }
@@ -544,11 +616,16 @@ private fun PhonePane(loading: Boolean) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun PrimaryActionButton(text: String, loading: Boolean, onClick: () -> Unit) {
+private fun PrimaryActionButton(
+    text: String,
+    loading: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Button(
         onClick = onClick,
         enabled = !loading,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp),
     ) {
@@ -573,11 +650,11 @@ private fun softFieldColors(): TextFieldColors = OutlinedTextFieldDefaults.color
 )
 
 @Composable
-fun GoogleSignInButton(loading: Boolean, onClick: () -> Unit) {
+fun GoogleSignInButton(loading: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     OutlinedButton(
         onClick = onClick,
         enabled = !loading,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp),
     ) {

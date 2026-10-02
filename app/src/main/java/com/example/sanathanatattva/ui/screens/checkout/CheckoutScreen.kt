@@ -1,6 +1,10 @@
 package com.example.sanathanatattva.ui.screens.checkout
 
 import android.app.Activity
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,9 +47,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -54,17 +67,39 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.sanathanatattva.ui.appContainer
+import com.example.sanathanatattva.ui.brand.OrderSealMedallion
+import com.example.sanathanatattva.ui.brand.SealLanding
+import com.example.sanathanatattva.ui.brand.SealMoment
+import com.example.sanathanatattva.ui.brand.SealOrigin
+import com.example.sanathanatattva.ui.brand.orderPlacedMoment
 import com.example.sanathanatattva.ui.navigation.Routes
+import com.example.sanathanatattva.ui.navigation.openTab
+import com.example.sanathanatattva.ui.components.EaseOutQuint
 import com.example.sanathanatattva.ui.components.TintedIcon
+import com.example.sanathanatattva.ui.components.rememberReducedMotion
 import com.example.sanathanatattva.ui.components.cardBorder
 import com.example.sanathanatattva.ui.session.SessionViewModel
+import com.example.sanathanatattva.ui.screens.luckydraw.LuckyDrawCheckoutNote
 import com.example.sanathanatattva.util.formatRupees
 import com.razorpay.Checkout
+import kotlinx.coroutines.delay
 import org.json.JSONObject
+
+/** Progress of the "order placed" celebration, as far as this screen is concerned. */
+private enum class OrderSeal { Idle, Playing, Revealed }
+
+private val SuccessMedallionDiameter = 72.dp
+
+/** When the success page starts rising in under a celebration: just after the green begins to settle. */
+private const val SUCCESS_ENTRANCE_DELAY_MS = 1180
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CheckoutScreen(navController: NavController, session: SessionViewModel) {
+fun CheckoutScreen(
+    navController: NavController,
+    session: SessionViewModel,
+    celebrate: (SealMoment) -> Unit,
+) {
     val container = appContainer()
     val vm: CheckoutViewModel = viewModel { CheckoutViewModel(container) }
     val state by vm.state.collectAsState()
@@ -97,10 +132,42 @@ fun CheckoutScreen(navController: NavController, session: SessionViewModel) {
 
     val stage = state.stage
 
+    // Payment confirmed → "one drop seals it": the confirming spinner becomes a drop,
+    // the green covers the screen, the success page is swapped in underneath, and the
+    // green settles as that page's medallion.
+    val reducedMotion = rememberReducedMotion()
+    var seal by remember { mutableStateOf(OrderSeal.Idle) }
+    var sawVerifying by remember { mutableStateOf(false) }
+    var spinnerBounds by remember { mutableStateOf<Rect?>(null) }
+    var medallionCenter by remember { mutableStateOf<Offset?>(null) }
+    val spinnerTint = MaterialTheme.colorScheme.primary
+    val celebrating = stage is CheckoutStage.Success &&
+        (seal == OrderSeal.Playing || (seal == OrderSeal.Idle && sawVerifying && spinnerBounds != null))
+
+    LaunchedEffect(stage) {
+        if (stage == CheckoutStage.Verifying) sawVerifying = true
+        val origin = spinnerBounds
+        if (stage is CheckoutStage.Success && seal == OrderSeal.Idle && sawVerifying && origin != null) {
+            seal = OrderSeal.Playing
+            celebrate(
+                orderPlacedMoment(
+                    origin = SealOrigin.Spinner(origin, spinnerTint),
+                    orderNumber = stage.orderNumber,
+                    medallion = {
+                        medallionCenter?.let { SealLanding.Medallion(it, SuccessMedallionDiameter / 2) }
+                    },
+                    onCovered = { seal = OrderSeal.Revealed },
+                ),
+            )
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (stage is CheckoutStage.Success) "Order placed" else "Checkout") },
+                title = {
+                    Text(if (stage is CheckoutStage.Success && !celebrating) "Order placed" else "Checkout")
+                },
                 navigationIcon = {
                     if (stage !is CheckoutStage.Success) {
                         IconButton(onClick = { navController.popBackStack() }) {
@@ -112,35 +179,43 @@ fun CheckoutScreen(navController: NavController, session: SessionViewModel) {
         },
     ) { padding ->
         when (stage) {
-            is CheckoutStage.Success -> SuccessContent(
-                stage = stage,
-                onTrackOrder = {
-                    navController.navigate(Routes.ORDERS) {
-                        popUpTo(Routes.SHOP) { inclusive = false }
-                    }
-                },
-                onBackToShop = {
-                    navController.popBackStack(Routes.SHOP, inclusive = false)
-                },
+            is CheckoutStage.Success -> if (celebrating) {
+                // The spinner has become the celebration's drop; hold this view until
+                // the green covers it.
+                ProgressContent(
+                    message = "Confirming your payment…",
+                    spinnerVisible = false,
+                    onSpinnerPlaced = {},
+                    modifier = Modifier.padding(padding),
+                )
+            } else {
+                SuccessContent(
+                    stage = stage,
+                    onTrackOrder = {
+                        navController.openTab(Routes.ORDERS)
+                    },
+                    onBackToShop = {
+                        navController.popBackStack(Routes.SHOP, inclusive = false)
+                    },
+                    onMedallionPlaced = { medallionCenter = it },
+                    entranceDelayMillis = if (seal == OrderSeal.Revealed && !reducedMotion) {
+                        SUCCESS_ENTRANCE_DELAY_MS
+                    } else {
+                        0
+                    },
+                    modifier = Modifier.padding(padding),
+                )
+            }
+
+            CheckoutStage.PlacingOrder, CheckoutStage.Verifying -> ProgressContent(
+                message = if (stage == CheckoutStage.Verifying) "Confirming your payment…"
+                else "Placing your order…",
+                spinnerVisible = true,
+                onSpinnerPlaced = { spinnerBounds = it },
                 modifier = Modifier.padding(padding),
             )
 
-            CheckoutStage.PlacingOrder, CheckoutStage.Verifying -> Box(
-                Modifier.padding(padding).fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        if (stage == CheckoutStage.Verifying) "Confirming your payment…"
-                        else "Placing your order…",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
-            }
-
-            else -> FormContent(vm, state, consumer?.dealer, Modifier.padding(padding))
+            else -> FormContent(vm, state, consumer?.dealer, Modifier.padding(padding), session)
         }
     }
 }
@@ -151,6 +226,7 @@ private fun FormContent(
     state: CheckoutUiState,
     partner: com.example.sanathanatattva.data.model.LinkedDealer?,
     modifier: Modifier,
+    session: SessionViewModel,
 ) {
     val est = vm.estimate()
 
@@ -170,6 +246,7 @@ private fun FormContent(
         }
 
         // ---- Delivery address ----
+        LuckyDrawCheckoutNote(session)
         SectionCard(title = "Delivery address") {
             state.addresses.forEach { address ->
                 Row(
@@ -461,13 +538,62 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
     }
 }
 
+/** "Placing your order…" / "Confirming your payment…" — a centred spinner and a line. */
+@Composable
+private fun ProgressContent(
+    message: String,
+    spinnerVisible: Boolean,
+    onSpinnerPlaced: (Rect) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val messageAlpha by animateFloatAsState(
+        targetValue = if (spinnerVisible) 1f else 0f,
+        animationSpec = tween(200),
+        label = "progress-message",
+    )
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .onGloballyPositioned { onSpinnerPlaced(it.boundsInRoot()) },
+            ) {
+                if (spinnerVisible) CircularProgressIndicator(Modifier.fillMaxSize())
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.alpha(messageAlpha),
+            )
+        }
+    }
+}
+
 @Composable
 private fun SuccessContent(
     stage: CheckoutStage.Success,
     onTrackOrder: () -> Unit,
     onBackToShop: () -> Unit,
+    onMedallionPlaced: (Offset) -> Unit,
+    entranceDelayMillis: Int,
     modifier: Modifier = Modifier,
 ) {
+    // After a celebration the medallion is already in place (the green settled into
+    // it); the words and actions rise in around it, one after another.
+    val entrance = remember { Animatable(if (entranceDelayMillis > 0) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        if (entranceDelayMillis > 0) {
+            delay(entranceDelayMillis.toLong())
+            entrance.animateTo(1f, tween(560, easing = LinearEasing))
+        }
+    }
+    fun Modifier.riseIn(step: Int) = graphicsLayer {
+        val p = EaseOutQuint.transform(((entrance.value * 560f - 80f * step) / 400f).coerceIn(0f, 1f))
+        alpha = p
+        translationY = (1f - p) * 10.dp.toPx()
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -476,15 +602,17 @@ private fun SuccessContent(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(32.dp))
-        Icon(
-            Icons.Filled.CheckCircle,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(72.dp),
+        OrderSealMedallion(
+            diameter = SuccessMedallionDiameter,
+            modifier = Modifier.onGloballyPositioned { onMedallionPlaced(it.boundsInRoot().center) },
         )
         Spacer(Modifier.height(16.dp))
-        Text("Order ${stage.orderNumber} placed", style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center)
+        Text(
+            "Order ${stage.orderNumber} placed",
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.riseIn(0),
+        )
         Spacer(Modifier.height(8.dp))
         if (stage.dealerName != null) {
             Text(
@@ -492,12 +620,14 @@ private fun SuccessContent(
                     (stage.dealerPhone?.let { " You can reach them on $it." } ?: ""),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
+                modifier = Modifier.riseIn(1),
             )
         } else {
             Text(
                 "We've received your order and will assign a delivery partner shortly.",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
+                modifier = Modifier.riseIn(1),
             )
         }
         Spacer(Modifier.height(32.dp))
@@ -505,8 +635,9 @@ private fun SuccessContent(
             onClick = onTrackOrder,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 52.dp),
+                .heightIn(min = 52.dp)
+                .riseIn(2),
         ) { Text("Track order") }
-        TextButton(onClick = onBackToShop) { Text("Back to shop") }
+        TextButton(onClick = onBackToShop, modifier = Modifier.riseIn(2)) { Text("Back to shop") }
     }
 }

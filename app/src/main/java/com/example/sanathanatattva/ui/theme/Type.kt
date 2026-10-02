@@ -1,10 +1,33 @@
 package com.example.sanathanatattva.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.example.sanathanatattva.R
+
+/**
+ * Cinzel (SIL OFL, see assets/licenses) — a stand-in for the hand-cut serif on
+ * the logo. Brand moments only (a name or a headline inside the splash / sign-in /
+ * order celebrations); the app's UI type stays one family, per DESIGN.md.
+ */
+@OptIn(ExperimentalTextApi::class)
+val EmblemSerif = FontFamily(
+    Font(
+        R.font.cinzel,
+        weight = FontWeight.SemiBold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(600)),
+    ),
+    Font(
+        R.font.cinzel,
+        weight = FontWeight.Bold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(700)),
+    ),
+)
 
 // One family (Roboto), fixed scale, weight carries hierarchy.
 // Body floor is 16sp: audience includes older, second-language readers.

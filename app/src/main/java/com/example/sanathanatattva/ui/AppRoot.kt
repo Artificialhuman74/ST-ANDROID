@@ -22,22 +22,31 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.sanathanatattva.App
 import com.example.sanathanatattva.AppContainer
+import com.example.sanathanatattva.ui.brand.BrandSplash
+import com.example.sanathanatattva.ui.brand.CelebrationHost
+import com.example.sanathanatattva.ui.brand.rememberCelebrationController
 import com.example.sanathanatattva.ui.components.DockItem
 import com.example.sanathanatattva.ui.components.LiquidDock
 import com.example.sanathanatattva.ui.navigation.Routes
+import com.example.sanathanatattva.ui.navigation.switchTab
 import com.example.sanathanatattva.ui.screens.account.AccountScreen
 import com.example.sanathanatattva.ui.screens.account.AddressesScreen
 import com.example.sanathanatattva.ui.screens.account.WalletScreen
@@ -51,6 +60,7 @@ import com.example.sanathanatattva.ui.screens.orders.OrderDetailScreen
 import com.example.sanathanatattva.ui.screens.orders.OrdersScreen
 import com.example.sanathanatattva.ui.screens.product.ProductDetailScreen
 import com.example.sanathanatattva.ui.screens.shop.ShopScreen
+import com.example.sanathanatattva.ui.screens.luckydraw.LuckyDrawScreen
 import com.example.sanathanatattva.ui.session.SessionViewModel
 
 @Composable
@@ -79,7 +89,16 @@ fun AppRoot() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
-    val showBottomBar = currentRoute in bottomDests.map { it.route }
+    val tabRoutes = bottomDests.map { it.route }
+    val showBottomBar = currentRoute in tabRoutes
+
+    // Brand moments are drawn above the NavHost so they outlive the navigation
+    // they cover (sign-in pops back; an order swaps to its success page).
+    val celebrations = rememberCelebrationController()
+    // Where each dock tab sits on screen, so a celebration can fold into one.
+    val tabBounds = remember { mutableStateMapOf<String, Rect>() }
+    // The splash plays once per launch — not again on rotation or a theme change.
+    var showSplash by rememberSaveable { mutableStateOf(true) }
 
     Scaffold { _ ->
         // Tab peers: near-instant fade (no slide — slides imply hierarchy, tabs are peers).
@@ -125,6 +144,13 @@ fun AppRoot() {
 
             // ── Push destinations (slide in/out) ──────────────────────────────
             composable(
+                Routes.LUCKY_DRAW,
+                enterTransition = { pushEnter },
+                exitTransition = { pushExit },
+                popEnterTransition = { popEnter },
+                popExitTransition = { popExit },
+            ) { LuckyDrawScreen(navController, session) }
+            composable(
                 Routes.PRODUCT,
                 enterTransition = { pushEnter },
                 exitTransition = { pushExit },
@@ -147,7 +173,7 @@ fun AppRoot() {
                 exitTransition = { pushExit },
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
-            ) { CheckoutScreen(navController, session) }
+            ) { CheckoutScreen(navController, session, celebrate = celebrations::play) }
             composable(
                 Routes.ORDER_DETAIL,
                 enterTransition = { pushEnter },
@@ -178,7 +204,7 @@ fun AppRoot() {
                 exitTransition = { pushExit },
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
-            ) { LoginScreen(navController, session) }
+            ) { LoginScreen(navController, session, celebrate = celebrations::play) }
             composable(
                 Routes.REGISTER,
                 enterTransition = { pushEnter },
@@ -201,16 +227,21 @@ fun AppRoot() {
                     items = bottomDests.map { DockItem(it.label, it.icon, it.selectedIcon) },
                     selectedIndex = bottomDests.indexOfFirst { it.route == currentRoute },
                     onSelect = { index ->
-                        navController.navigate(bottomDests[index].route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        navController.switchTab(bottomDests[index].route)
                     },
+                    onItemBounds = { index, bounds -> tabBounds[bottomDests[index].route] = bounds },
                 )
             }
+
+            CelebrationHost(
+                controller = celebrations,
+                // Only fold into a tab the user can actually see right now.
+                tabBounds = { route ->
+                    tabBounds[route].takeIf { navController.currentDestination?.route in tabRoutes }
+                },
+            )
+
+            if (showSplash) BrandSplash(onFinished = { showSplash = false })
         }
     }
 }

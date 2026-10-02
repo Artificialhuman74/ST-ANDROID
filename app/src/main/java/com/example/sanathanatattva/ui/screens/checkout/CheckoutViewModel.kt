@@ -83,6 +83,7 @@ class CheckoutViewModel(private val container: AppContainer) : ViewModel() {
 
     private var cart: List<CartLine> = emptyList()
     private var pendingOrderId: Long? = null
+    private var pendingRazorpayOrderId: String? = null
     private var pendingOrderNumber: String? = null
     private var pendingDelivery: Triple<String?, String?, String?>? = null // name, phone, message
     private var referralJob: Job? = null
@@ -124,9 +125,11 @@ class CheckoutViewModel(private val container: AppContainer) : ViewModel() {
     private fun listenForPaymentResults() {
         viewModelScope.launch {
             PaymentEvents.events.collect { event ->
+                if (state.value.stage != CheckoutStage.AwaitingPayment) return@collect
                 val orderId = pendingOrderId ?: return@collect
                 when (event) {
                     is PaymentEvent.Success -> {
+                        if (event.orderId != null && event.orderId != pendingRazorpayOrderId) return@collect
                         state.value = state.value.copy(stage = CheckoutStage.Verifying)
                         val rzpOrderId = event.orderId
                         val signature = event.signature
@@ -325,6 +328,7 @@ class CheckoutViewModel(private val container: AppContainer) : ViewModel() {
     private suspend fun startPayment(orderId: Long, orderNumber: String) {
         apiCall { container.api.createPayment(CreatePaymentRequest(orderId)) }
             .onSuccess { pay ->
+                pendingRazorpayOrderId = pay.razorpay_order_id
                 state.value = state.value.copy(stage = CheckoutStage.AwaitingPayment)
                 val consumer = state.value.consumer
                 openRazorpay.tryEmit(

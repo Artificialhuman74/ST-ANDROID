@@ -18,6 +18,7 @@ class AppContainer(app: Application) {
     val tokenStore = TokenStore(app)
     val cartStore = CartStore(app)
     val containerPrefs = ContainerPrefsStore(app)
+    val luckyDrawPrefs = com.example.sanathanatattva.data.prefs.LuckyDrawPrefsStore(app)
     val api: ApiService = ApiClient.create(tokenStore).create(ApiService::class.java)
 }
 

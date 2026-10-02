@@ -15,6 +15,9 @@ import com.razorpay.PaymentResultWithDataListener
 class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The manifest launches with the press-green starting theme; from here on the
+        // app's own theme applies (the brand splash is drawn in Compose).
+        setTheme(R.style.Theme_SanathanaTattva)
         super.onCreate(savedInstanceState)
         Checkout.preload(applicationContext)
         enableEdgeToEdge()

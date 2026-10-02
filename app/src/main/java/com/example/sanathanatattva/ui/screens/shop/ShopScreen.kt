@@ -123,6 +123,7 @@ import com.example.sanathanatattva.ui.components.TopSnackbarHost
 import com.example.sanathanatattva.ui.components.rememberReducedMotion
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
+import com.example.sanathanatattva.ui.screens.luckydraw.LuckyDrawShopCard
 import com.example.sanathanatattva.util.formatRupees
 import java.util.Calendar
 import kotlin.math.roundToInt
@@ -237,7 +238,7 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
             )
             Text(
-                "Cold-pressed oils, kept in steel.",
+                "What would you like to order today?",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
@@ -314,6 +315,7 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    item(key = "lucky_draw") { LuckyDrawShopCard(navController, session) }
                     items(4) {
                         SkeletonBlock(Modifier.fillMaxWidth(), height = 120.dp, corner = 16.dp)
                     }
@@ -341,6 +343,7 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    item(key = "lucky_draw") { LuckyDrawShopCard(navController, session) }
                     itemsIndexed(state.products, key = { _, p -> p.id }) { index, product ->
                         val staggerDelay = if (!playedEntrance) (index * 50).coerceAtMost(300) else 0
                         var visible by remember(product.id) { mutableStateOf(playedEntrance) }

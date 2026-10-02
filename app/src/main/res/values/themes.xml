@@ -2,4 +2,14 @@
 <resources>
 
     <style name="Theme.SanathanaTattva" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Launch window only (MainActivity swaps to Theme.SanathanaTattva in onCreate):
+         plain press-green, so the system splash hands off to the in-app brand splash
+         (ui/brand/BrandSplash) without a seam. -->
+    <style name="Theme.SanathanaTattva.Starting">
+        <item name="android:windowBackground">@color/splash_ground</item>
+        <item name="android:statusBarColor">@color/splash_ground</item>
+        <item name="android:navigationBarColor">@color/splash_ground</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -45,6 +46,8 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
@@ -79,6 +82,9 @@ val DockContentClearance = 88.dp
  * Legibility is never traded away for the effect — the dock is fully opaque and
  * icons/labels sit at full contrast (deliberately not glassmorphic, per DESIGN.md).
  * Under system reduced-motion the pill snaps instead of gliding.
+ *
+ * [onItemBounds] reports each destination's slot in root coordinates, so
+ * something drawn above the app (a brand moment folding into a tab) can find it.
  */
 @Composable
 fun LiquidDock(
@@ -86,6 +92,7 @@ fun LiquidDock(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    onItemBounds: (index: Int, bounds: Rect) -> Unit = { _, _ -> },
 ) {
     if (items.isEmpty()) return
     val reduced = rememberReducedMotion()
@@ -276,6 +283,7 @@ fun LiquidDock(
                         Modifier
                             .weight(1f)
                             .fillMaxHeight()
+                            .onGloballyPositioned { onItemBounds(i, it.boundsInRoot()) }
                             .clip(RoundedCornerShape(22.dp))
                             .selectable(
                                 selected = i == safeIndex,

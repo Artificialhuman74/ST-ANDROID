@@ -45,6 +45,7 @@ import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -241,6 +242,14 @@ fun AccountScreen(navController: NavController, session: SessionViewModel) {
             ) {
                 Column {
                     // Store credit is money → gold medallion (the one place gold lives).
+                    AccountLink(
+                        icon = Icons.Outlined.CardGiftcard,
+                        label = "Bhagya Chakra · Lucky draw",
+                        onClick = { navController.navigate(Routes.LUCKY_DRAW) },
+                        container = MaterialTheme.colorScheme.tertiaryContainer,
+                        content = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     AccountLink(
                         icon = Icons.Outlined.AccountBalanceWallet,
                         label = "Store credit",

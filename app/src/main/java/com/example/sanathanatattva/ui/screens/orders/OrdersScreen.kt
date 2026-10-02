@@ -42,8 +42,10 @@ import com.example.sanathanatattva.ui.components.SkeletonBlock
 import com.example.sanathanatattva.ui.components.TintedIcon
 import com.example.sanathanatattva.ui.components.cardBorder
 import com.example.sanathanatattva.ui.navigation.Routes
+import com.example.sanathanatattva.ui.navigation.openTab
 import com.example.sanathanatattva.ui.session.SessionViewModel
 import com.example.sanathanatattva.util.formatRupees
+import com.example.sanathanatattva.ui.screens.luckydraw.LuckyDrawOrderBadge
 
 /** Human labels for order statuses. */
 fun statusLabel(status: String): String = when (status) {
@@ -101,7 +103,7 @@ fun OrdersScreen(navController: NavController, session: SessionViewModel) {
                 title = "No orders yet",
                 body = "When you place your first order, its delivery progress will show up here.",
                 actionLabel = "Browse the shop",
-                onAction = { navController.navigate(Routes.SHOP) },
+                onAction = { navController.openTab(Routes.SHOP) },
                 modifier = Modifier.padding(padding),
             )
 
@@ -158,6 +160,7 @@ private fun OrderCard(order: Order, onClick: () -> Unit) {
                     StatusChip(order.status)
                 }
                 Spacer(Modifier.height(6.dp))
+                LuckyDrawOrderBadge(order.order_number)
                 Text(
                     order.items.joinToString { "${it.quantity} × ${it.product_name}" }
                         .ifBlank { "${order.item_count} items" },

@@ -156,6 +156,7 @@ data class PostReviewRequest(val rating: Int, val body: String? = null)
 @Serializable
 data class ContainerHolding(
     val id: Long,
+    val source: String = "purchase",
     val container_type: String = "",
     val current_product_id: Long? = null,
     val current_product_name: String? = null,

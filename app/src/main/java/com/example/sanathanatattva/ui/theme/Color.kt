@@ -33,3 +33,12 @@ val OutlineFaint = Color(0xFFC0C9C1)
 val ErrorRed = Color(0xFFBA1A1A)
 val ErrorContainer = Color(0xFFFFDAD6)
 val OnErrorContainer = Color(0xFF410002)
+
+// Brand moments only (splash, sign-in and order celebrations — ui/brand): the
+// press-room green, the cream of the logo's lettering, and cold-pressed oil.
+// Never for everyday chrome: in the app proper, gold still means money.
+val PressGreen = Color(0xFF0E3A21)
+val LogoCream = Color(0xFFF3E9D2)
+val OilGold = Color(0xFFE3A532)
+val OilLight = Color(0xFFF6CB66)
+val OilDeep = Color(0xFFCC8820)

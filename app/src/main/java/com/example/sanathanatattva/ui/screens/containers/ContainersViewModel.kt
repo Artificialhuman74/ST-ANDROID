@@ -23,6 +23,7 @@ data class ContainersUiState(
     val swappable: List<SwappableProduct> = emptyList(),
     val actionMessage: String? = null,
     val actionInProgress: Boolean = false,
+    val rewardRoundActive: Boolean? = null,
 )
 
 class ContainersViewModel(private val container: AppContainer) : ViewModel() {
@@ -47,11 +48,15 @@ class ContainersViewModel(private val container: AppContainer) : ViewModel() {
             }
             apiCall { container.api.containers() }
                 .onSuccess { res ->
+                    val rewardRoundActive = if (res.held.any { it.source == "lucky_draw_reward" }) {
+                        apiCall { container.api.luckyDrawStatus() }.getOrNull()?.let { it.enrollment != null }
+                    } else false
                     state.value = state.value.copy(
                         loading = false,
                         held = res.held,
                         history = res.history,
                         swappable = res.swappable,
+                        rewardRoundActive = rewardRoundActive,
                     )
                 }
                 .onFailure { e ->

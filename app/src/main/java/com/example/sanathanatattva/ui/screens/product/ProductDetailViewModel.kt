@@ -6,7 +6,12 @@ import com.example.sanathanatattva.AppContainer
 import com.example.sanathanatattva.data.apiCall
 import com.example.sanathanatattva.data.model.Product
 import com.example.sanathanatattva.data.model.Review
+import com.example.sanathanatattva.data.cart.CartLine
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class ProductDetailUiState(
@@ -18,7 +23,6 @@ data class ProductDetailUiState(
     val averageRating: Double? = null,
     val reviewCount: Int = 0,
     val heldCount: Int = 0,
-    val refillRemaining: Int = 0,
 )
 
 class ProductDetailViewModel(
@@ -27,6 +31,11 @@ class ProductDetailViewModel(
 ) : ViewModel() {
 
     val state = MutableStateFlow(ProductDetailUiState())
+
+    /** This product's lines in the cart, live — the page shows what's already added. */
+    val cartLines: StateFlow<List<CartLine>> = container.cartStore.lines
+        .map { lines -> lines.filter { it.productId == productId } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
         load()
@@ -61,14 +70,7 @@ class ProductDetailViewModel(
             }
             if (container.tokenStore.current() != null) {
                 apiCall { container.api.refillCaps() }.onSuccess { res ->
-                    val held = res.caps[productId.toString()] ?: 0
-                    val inCart = container.cartStore.current()
-                        .filter { it.productId == productId && it.isRefill }
-                        .sumOf { it.quantity }
-                    state.value = state.value.copy(
-                        heldCount = held,
-                        refillRemaining = (held - inCart).coerceAtLeast(0),
-                    )
+                    state.value = state.value.copy(heldCount = res.caps[productId.toString()] ?: 0)
                 }
             }
         }
@@ -77,6 +79,10 @@ class ProductDetailViewModel(
     fun addToCart(isRefill: Boolean) {
         val product = state.value.product ?: return
         viewModelScope.launch { container.cartStore.add(product, isRefill) }
+    }
+
+    fun removeFromCart(isRefill: Boolean) {
+        viewModelScope.launch { container.cartStore.decrement(productId, isRefill) }
     }
 
     /** image_urls can be a JSON array, comma/newline separated, or absent. */

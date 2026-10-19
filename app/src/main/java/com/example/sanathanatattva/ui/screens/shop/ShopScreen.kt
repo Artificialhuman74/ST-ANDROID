@@ -49,6 +49,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import com.example.sanathanatattva.ui.components.CartStepper
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
@@ -142,6 +149,8 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
     val scope = rememberCoroutineScope()
 
     val totals = cartLines.totals()
+    val visible = remember(state.products, state.search, state.selectedCategory, state.sort) { state.visibleProducts() }
+    val keyboard = LocalSoftwareKeyboardController.current
 
     // A warm, time-aware greeting — personalised when we know who's shopping.
     val greeting = remember(consumer?.name) {
@@ -271,19 +280,52 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                         } else 0f
                     },
             ) {
-                OutlinedTextField(
-                    value = state.search,
-                    onValueChange = vm::setSearch,
-                    placeholder = { Text("Search oils, ghee…") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(28.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { vm.submitSearch() }),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                ) {
+                    OutlinedTextField(
+                        value = state.search,
+                        onValueChange = vm::setSearch,
+                        placeholder = { Text("Search oils, ghee…") },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (state.search.isNotEmpty()) {
+                                IconButton(onClick = { vm.setSearch("") }) {
+                                    Icon(Icons.Filled.Close, contentDescription = "Clear search")
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(28.dp),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        // Results already update as you type; Search just tucks the keyboard away.
+                        keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box {
+                        var sortOpen by remember { mutableStateOf(false) }
+                        IconButton(onClick = { sortOpen = true }, modifier = Modifier.size(48.dp)) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Sort,
+                                contentDescription = "Sort: ${state.sort.label}",
+                                tint = if (state.sort == ShopSort.Featured) MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
+                            ShopSort.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.label) },
+                                    leadingIcon = {
+                                        if (option == state.sort) Icon(Icons.Filled.Check, contentDescription = null)
+                                    },
+                                    onClick = { vm.setSort(option); sortOpen = false },
+                                )
+                            }
+                        }
+                    }
+                }
 
                 if (state.categories.isNotEmpty()) {
                     LazyRow(
@@ -324,7 +366,7 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                     onRetry = vm::load,
                 )
 
-                state.products.isEmpty() -> EmptyState(
+                visible.isEmpty() -> EmptyState(
                     icon = Icons.Outlined.ProductionQuantityLimits,
                     title = "Nothing matches",
                     body = "Try a different search word or category.",
@@ -341,17 +383,19 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    itemsIndexed(state.products, key = { _, p -> p.id }) { index, product ->
+                    itemsIndexed(visible, key = { _, p -> p.id }) { index, product ->
                         val staggerDelay = if (!playedEntrance) (index * 50).coerceAtMost(300) else 0
-                        var visible by remember(product.id) { mutableStateOf(playedEntrance) }
+                        var shown by remember(product.id) { mutableStateOf(playedEntrance) }
                         LaunchedEffect(product.id) {
                             if (!playedEntrance) {
                                 kotlinx.coroutines.delay(staggerDelay.toLong())
-                                visible = true
+                                shown = true
                             }
                         }
                         AnimatedVisibility(
-                            visible = visible,
+                            visible = shown,
+                            // Glides to its new place when the search, category or sort changes.
+                            modifier = Modifier.animateItem(),
                             enter = fadeIn(tween(280)) + slideInVertically(
                                 initialOffsetY = { it / 4 },
                                 animationSpec = tween(280, easing = FastOutSlowInEasing),
@@ -542,17 +586,17 @@ private fun ProductCard(
 
                     // Refill available (or already in the cart): a control for each of
                     // refill and buy, each swapping to a stepper once it holds items.
-                    refillRemaining > 0 || refillInCart > 0 -> Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    refillRemaining > 0 || refillInCart > 0 -> Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        AddOrStepper(
+                        CartStepper(
                             label = "Refill",
                             count = refillInCart,
                             canIncrement = refillRemaining > 0,
                             onIncrement = { onAdd(true) },
                             onDecrement = { onRemove(true) },
                         )
-                        AddOrStepper(
+                        CartStepper(
                             label = "Buy",
                             count = buyInCart,
                             tonal = true,
@@ -561,7 +605,7 @@ private fun ProductCard(
                         )
                     }
 
-                    else -> AddOrStepper(
+                    else -> CartStepper(
                         label = "Add",
                         count = buyInCart,
                         onIncrement = { onAdd(false) },
@@ -571,457 +615,6 @@ private fun ProductCard(
             }
         }
     }
-}
-
-// Ease-out curves for the Add/Refill motion — deceleration only, so nothing ever
-// overshoots or wobbles. Expo is the calmest (long, gentle tail); quart is a touch
-// quicker for exits. No spring/bounce anywhere: the brief was "soothing, no bounce."
-private val EaseOutExpo = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
-private val EaseOutQuart = CubicBezierEasing(0.25f, 1f, 0.5f, 1f)
-
-/**
- * The liquid-glass press response for the Add/Refill controls — the app's one
- * repeat-order hero interaction. On press it softens asymmetrically (a little
- * wider, a little shorter, like a drop of liquid yielding under a finger) and a
- * crown of light blooms across the top for a glassy read. On release both axes
- * ease back home on a decelerating curve with **no overshoot** — it settles like
- * water finding its level, never a springy snap-back. A faint static sheen sits
- * across the top at rest so the surface always reads as glass, not flat paint;
- * it fades out by mid-height so the icon/label below keep full contrast. Buy's
- * controls intentionally don't get this — a different, plainer action. Skipped
- * under reduced motion (the static sheen stays; it isn't motion).
- */
-@Composable
-private fun rememberLiquidPress(pressed: Boolean, reducedMotion: Boolean): Modifier {
-    val scaleX = remember { Animatable(1f) }
-    val scaleY = remember { Animatable(1f) }
-    // 0 at rest, 1 fully pressed — drives the specular bloom's strength.
-    val press = remember { Animatable(0f) }
-
-    LaunchedEffect(pressed, reducedMotion) {
-        if (reducedMotion) {
-            scaleX.snapTo(1f)
-            scaleY.snapTo(1f)
-            press.snapTo(0f)
-            return@LaunchedEffect
-        }
-        if (pressed) {
-            launch { scaleX.animateTo(1.06f, tween(120, easing = EaseOutQuart)) }
-            launch { scaleY.animateTo(0.90f, tween(120, easing = EaseOutQuart)) }
-            launch { press.animateTo(1f, tween(120, easing = EaseOutQuart)) }
-        } else {
-            // Long, purely-decelerating return — the two axes take slightly
-            // different times so the surface relaxes rather than snapping, but
-            // neither crosses 1f, so there is no bounce.
-            launch { scaleX.animateTo(1f, tween(430, easing = EaseOutExpo)) }
-            launch { scaleY.animateTo(1f, tween(470, easing = EaseOutExpo)) }
-            launch { press.animateTo(0f, tween(360, easing = EaseOutQuart)) }
-        }
-    }
-
-    return Modifier
-        .graphicsLayer {
-            this.scaleX = scaleX.value
-            this.scaleY = scaleY.value
-        }
-        .drawWithContent {
-            drawContent()
-            // Static glass crown: a soft band of light across the top, brighter
-            // under a fingertip. Gone by half height, so content stays crisp.
-            drawRect(
-                brush = Brush.verticalGradient(
-                    0f to Color.White.copy(alpha = 0.16f + 0.16f * press.value),
-                    0.5f to Color.Transparent,
-                ),
-            )
-            // A specular bloom near the top that swells with the press — light
-            // catching the curve of a wet, glassy surface.
-            if (press.value > 0f) {
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.22f * press.value),
-                            Color.Transparent,
-                        ),
-                        center = Offset(size.width * 0.5f, size.height * 0.28f),
-                        radius = size.maxDimension * 0.7f,
-                    ),
-                )
-            }
-        }
-}
-
-/**
- * Shows an add button until the line holds at least one unit, then swaps to a
- * stepper. Buy keeps its fused sage pill with a plain instant swap; Add/Refill
- * (tonal = false) morph like water: the single glass pill divides into two green
- * droplets that glide apart, and rejoin into one pill when the count returns to
- * zero. Every curve here decelerates only — no spring, no overshoot, no bounce.
- */
-@Composable
-private fun AddOrStepper(
-    label: String,
-    count: Int,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit,
-    tonal: Boolean = false,
-    canIncrement: Boolean = true,
-) {
-    if (tonal) {
-        if (count <= 0) {
-            FilledTonalButton(onClick = onIncrement) { Text(label) }
-        } else {
-            FusedStepper(
-                label = label,
-                count = count,
-                onIncrement = onIncrement,
-                onDecrement = onDecrement,
-                canIncrement = canIncrement,
-            )
-        }
-        return
-    }
-
-    val reducedMotion = rememberReducedMotion()
-    AnimatedContent(
-        targetState = count > 0,
-        // Anchor the LEFT edge: the pill and the stepper share a left edge, so the
-        // whole morph grows rightward from a fixed point rather than out of the centre.
-        contentAlignment = Alignment.CenterStart,
-        transitionSpec = {
-            val enterExit = if (reducedMotion) {
-                fadeIn(snap()) togetherWith fadeOut(snap())
-            } else {
-                // A gentle cross-dissolve with a soft ease-out scale. The actual
-                // "water splitting / rejoining" is carried by the droplets inside
-                // LiquidStepper (they read this same transition and glide apart or
-                // together). Here we only dissolve the pill against the stepper and
-                // let the width flow between them on a decelerating curve.
-                (fadeIn(tween(260, easing = EaseOutQuart)) +
-                    scaleIn(initialScale = 0.9f, animationSpec = tween(320, easing = EaseOutExpo))) togetherWith
-                    (fadeOut(tween(150, easing = EaseOutQuart)) +
-                        scaleOut(targetScale = 0.92f, animationSpec = tween(220, easing = EaseOutQuart)))
-            }
-            enterExit.using(
-                SizeTransform(clip = false) { _, _ ->
-                    if (reducedMotion) snap() else tween(380, easing = EaseOutExpo)
-                },
-            )
-        },
-        label = "addRefillMorph",
-    ) { hasQuantity ->
-        if (hasQuantity) {
-            LiquidStepper(
-                label = label,
-                count = count,
-                onIncrement = onIncrement,
-                onDecrement = onDecrement,
-                canIncrement = canIncrement,
-                reducedMotion = reducedMotion,
-            )
-        } else {
-            LiquidAddPill(
-                label = label,
-                onClick = onIncrement,
-                reducedMotion = reducedMotion,
-            )
-        }
-    }
-}
-
-/**
- * The merged state: a single pill of green glass. Custom-built (not a Material
- * Button) so the glass crown from [rememberLiquidPress] sits over the fill and
- * under the label, and so it clips cleanly to the pill shape.
- */
-@Composable
-private fun LiquidAddPill(
-    label: String,
-    onClick: () -> Unit,
-    reducedMotion: Boolean,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    Surface(
-        onClick = onClick,
-        interactionSource = interactionSource,
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-        modifier = Modifier
-            .heightIn(min = 44.dp)
-            .clip(RoundedCornerShape(50))
-            .then(rememberLiquidPress(pressed, reducedMotion)),
-    ) {
-        Box(
-            Modifier.padding(horizontal = 22.dp, vertical = 11.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-    }
-}
-
-/** Buy's stepper: one sage pill — its own visual language, kept distinct from a refill. */
-@Composable
-private fun FusedStepper(
-    label: String,
-    count: Int,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit,
-    canIncrement: Boolean,
-) {
-    val containerColor = MaterialTheme.colorScheme.secondaryContainer
-    val contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-
-    Surface(color = containerColor, shape = RoundedCornerShape(50)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onDecrement, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    Icons.Filled.Remove,
-                    contentDescription = "Remove one $label",
-                    tint = contentColor,
-                )
-            }
-            Text(
-                "$count",
-                style = MaterialTheme.typography.titleMedium,
-                color = contentColor,
-            )
-            IconButton(
-                onClick = onIncrement,
-                enabled = canIncrement,
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = "Add one $label",
-                    tint = if (canIncrement) contentColor else contentColor.copy(alpha = 0.4f),
-                )
-            }
-        }
-    }
-}
-
-/**
- * Add/Refill's separated state, as liquid glass. Both the minus and the plus are
- * green blobs sharing ONE gooey metaball layer: at rest-of-pill they're stacked
- * (one droplet); as the stepper enters, the plus tears off the fixed minus and a
- * real liquid neck stretches between them and finally snaps. The split is driven
- * by a low-damping spring, so the plus overshoots and *jiggles* as it separates,
- * and each droplet squishes under a fingertip (press) — interactive, like glass.
- *
- * The goo (blur + alpha threshold) needs API 31; below that the blobs simply
- * spring apart with no connecting neck. The −/+ icons and the count are drawn
- * crisply on top of the goo, never blurred.
- */
-@Composable
-private fun AnimatedVisibilityScope.LiquidStepper(
-    label: String,
-    count: Int,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit,
-    canIncrement: Boolean,
-    reducedMotion: Boolean,
-) {
-    val density = LocalDensity.current
-
-    // 1f fully split (at rest), 0f fused onto the minus. A mildly under-damped
-    // spring gives one gentle overshoot as the plus tears off — a hint of jiggle,
-    // not a wobble; the merge is near-critically damped so it just settles.
-    val split by transition.animateFloat(
-        transitionSpec = {
-            when {
-                reducedMotion -> snap()
-                targetState == EnterExitState.Visible ->
-                    spring(dampingRatio = 0.62f, stiffness = 300f)
-                else -> spring(dampingRatio = 0.85f, stiffness = 340f)
-            }
-        },
-        label = "waterSplit",
-    ) { if (it == EnterExitState.Visible) 1f else 0f }
-
-    val circle = 44.dp
-    val sep = 92.dp                        // minus-centre → plus-centre, fully open
-    // Extra room around the blobs so the spring overshoot (and the blur) isn't
-    // clipped by the goo layer's bounds.
-    val extra = 16.dp
-    val containerW = circle + sep + extra
-    val containerH = 56.dp
-    val sepPx = with(density) { sep.toPx() }
-    val minusCenterPx = with(density) { (circle / 2).toPx() }
-    val containerCenterPx = with(density) { (containerW / 2).toPx() }
-
-    val green = MaterialTheme.colorScheme.primary
-    val onGreen = MaterialTheme.colorScheme.onPrimary
-
-    val decSource = remember { MutableInteractionSource() }
-    val decPressed by decSource.collectIsPressedAsState()
-    val incSource = remember { MutableInteractionSource() }
-    val incPressed by incSource.collectIsPressedAsState()
-
-    // The goo (an offscreen blur) is only needed while the droplets are actually
-    // parting — gate it to the mid-morph so the resting stepper is just two crisp,
-    // cheap circles. derivedStateOf flips this at most twice per morph, so the goo
-    // toggling never costs a per-frame recomposition.
-    val gooActive by remember { derivedStateOf { split > 0.02f && split < 0.98f } }
-
-    Box(
-        Modifier
-            .width(containerW)
-            .height(containerH),
-    ) {
-        // ── Goo: both blobs in one gooey layer so a liquid neck bridges them.
-        Box(
-            Modifier
-                .matchParentSize()
-                .liquidGoo(blur = 13.dp, active = gooActive),
-        ) {
-            Box(
-                Modifier
-                    .size(circle)
-                    .align(Alignment.CenterStart)
-                    .clip(CircleShape)
-                    .background(green),
-            )
-            Box(
-                Modifier
-                    .size(circle)
-                    .align(Alignment.CenterStart)
-                    .graphicsLayer { translationX = split * sepPx }
-                    .clip(CircleShape)
-                    .background(green),
-            )
-        }
-
-        // ── Count, riding the midpoint of the opening gap (under the icons).
-        Box(
-            Modifier
-                .matchParentSize()
-                .graphicsLayer {
-                    // Ride the gap midpoint (between the minus centre and the plus
-                    // centre), shifting the container-centred count onto it. All
-                    // reads of `split` stay in this layer block, so the whole morph
-                    // runs in the draw phase with no per-frame recomposition.
-                    translationX = minusCenterPx + split * sepPx / 2f - containerCenterPx
-                    // The number only wells up once the droplets have clearly parted.
-                    alpha = ((split - 0.55f) / 0.45f).coerceIn(0f, 1f)
-                    val s = 0.6f + 0.4f * split
-                    scaleX = s
-                    scaleY = s
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            AnimatedContent(
-                targetState = count,
-                transitionSpec = {
-                    if (reducedMotion) {
-                        fadeIn(snap()) togetherWith fadeOut(snap())
-                    } else {
-                        val dir = if (targetState > initialState) 1 else -1
-                        (slideInVertically(tween(200, easing = EaseOutQuart)) { h -> dir * h / 2 } +
-                            fadeIn(tween(160))) togetherWith
-                            (slideOutVertically(tween(180, easing = EaseOutQuart)) { h -> -dir * h / 2 } +
-                                fadeOut(tween(120)))
-                    }
-                },
-                label = "count",
-            ) { c ->
-                Text(
-                    "$c",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-
-        // ── Crisp icons on top, each its own tap target with the liquid press-
-        // squish, so touching a droplet deforms it.
-        Box(
-            Modifier
-                .size(circle)
-                .align(Alignment.CenterStart)
-                .clip(CircleShape)
-                .then(rememberLiquidPress(decPressed, reducedMotion))
-                .clickable(interactionSource = decSource, indication = null, onClick = onDecrement),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Filled.Remove, contentDescription = "Remove one $label", tint = onGreen)
-        }
-        Box(
-            Modifier
-                .size(circle)
-                .align(Alignment.CenterStart)
-                .graphicsLayer { translationX = split * sepPx }
-                .clip(CircleShape)
-                .then(rememberLiquidPress(incPressed, reducedMotion))
-                .clickable(
-                    enabled = canIncrement,
-                    interactionSource = incSource,
-                    indication = null,
-                    onClick = onIncrement,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Filled.Add,
-                contentDescription = "Add one $label",
-                tint = if (canIncrement) onGreen else onGreen.copy(alpha = 0.6f),
-            )
-        }
-    }
-}
-
-/**
- * The gooey metaball filter: blur the layer, then push alpha through a steep
- * threshold so overlapping blobs fuse into one smooth body with a stretching
- * neck and crisp edges. API 31+; a no-op below (blobs just move, no neck).
- */
-@Composable
-private fun Modifier.liquidGoo(blur: Dp, active: Boolean): Modifier {
-    val blurPx = with(LocalDensity.current) { blur.toPx() }
-    // Built once and cached; null below API 31 (no blur RenderEffect there). Kept
-    // out of the `active` branch so the remember call count never changes.
-    val effect = remember(blurPx) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) gooRenderEffect(blurPx) else null
-    }
-    return if (active && effect != null) {
-        graphicsLayer {
-            renderEffect = effect
-            clip = false
-        }
-    } else {
-        this
-    }
-}
-
-@RequiresApi(Build.VERSION_CODES.S)
-private fun gooRenderEffect(blurPx: Float): androidx.compose.ui.graphics.RenderEffect {
-    val blur = android.graphics.RenderEffect.createBlurEffect(
-        blurPx, blurPx, android.graphics.Shader.TileMode.DECAL,
-    )
-    // alpha' = 40·alpha − 6000: soft blurred edges below ~0.59 vanish, above snap
-    // opaque — turning the blur back into a crisp liquid body with a neck.
-    val threshold = android.graphics.ColorMatrix(
-        floatArrayOf(
-            1f, 0f, 0f, 0f, 0f,
-            0f, 1f, 0f, 0f, 0f,
-            0f, 0f, 1f, 0f, 0f,
-            0f, 0f, 0f, 40f, -6000f,
-        ),
-    )
-    return android.graphics.RenderEffect
-        .createColorFilterEffect(
-            android.graphics.ColorMatrixColorFilter(threshold),
-            blur,
-        )
-        .asComposeRenderEffect()
 }
 
 @Composable

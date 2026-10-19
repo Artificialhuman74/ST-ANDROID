@@ -19,9 +19,42 @@ data class ShopUiState(
     val categories: List<String> = emptyList(),
     val selectedCategory: String? = null,
     val search: String = "",
+    val sort: ShopSort = ShopSort.Featured,
     /** product_id -> held container count usable for refills. */
     val refillCaps: Map<Long, Int> = emptyMap(),
 )
+
+enum class ShopSort(val label: String) {
+    Featured("Featured"),
+    PriceLow("Price: low to high"),
+    PriceHigh("Price: high to low"),
+    Name("Name A–Z"),
+}
+
+/**
+ * What the list shows. The catalogue is small, so search, category and sort all
+ * run on the device: results change as you type, with no reload from the server.
+ */
+fun ShopUiState.visibleProducts(): List<Product> {
+    val q = search.trim().lowercase()
+    var list = products.filter { p ->
+        (selectedCategory == null || p.category == selectedCategory) &&
+            (q.isEmpty() || p.name.lowercase().contains(q) || p.description.orEmpty().lowercase().contains(q))
+    }
+    if (q.isNotEmpty()) {
+        // Names starting with what you typed first, then name matches, then description-only.
+        list = list.sortedBy { p ->
+            val n = p.name.lowercase()
+            if (n.startsWith(q)) 0 else if (n.contains(q)) 1 else 2
+        }
+    }
+    return when (sort) {
+        ShopSort.Featured -> list
+        ShopSort.PriceLow -> list.sortedBy { it.price }
+        ShopSort.PriceHigh -> list.sortedByDescending { it.price }
+        ShopSort.Name -> list.sortedBy { it.name.lowercase() }
+    }
+}
 
 class ShopViewModel(private val container: AppContainer) : ViewModel() {
 
@@ -34,15 +67,11 @@ class ShopViewModel(private val container: AppContainer) : ViewModel() {
         load()
     }
 
+    /** Loads the whole catalogue once; filtering happens locally (see [visibleProducts]). */
     fun load() {
-        state.value = state.value.copy(loading = true, error = null)
+        state.value = state.value.copy(loading = state.value.products.isEmpty(), error = null)
         viewModelScope.launch {
-            apiCall {
-                container.api.products(
-                    search = state.value.search.ifBlank { null },
-                    category = state.value.selectedCategory,
-                )
-            }
+            apiCall { container.api.products(search = null, category = null) }
                 .onSuccess { res ->
                     state.value = state.value.copy(
                         loading = false,
@@ -72,11 +101,12 @@ class ShopViewModel(private val container: AppContainer) : ViewModel() {
         state.value = state.value.copy(search = text)
     }
 
-    fun submitSearch() = load()
-
     fun selectCategory(category: String?) {
         state.value = state.value.copy(selectedCategory = category)
-        load()
+    }
+
+    fun setSort(sort: ShopSort) {
+        state.value = state.value.copy(sort = sort)
     }
 
     fun addToCart(product: Product, isRefill: Boolean) {
@@ -85,11 +115,7 @@ class ShopViewModel(private val container: AppContainer) : ViewModel() {
 
     /** Removes one unit of a cart line; drops the line entirely when it hits zero. */
     fun removeFromCart(productId: Long, isRefill: Boolean) {
-        val line = cartLines.value
-            .firstOrNull { it.productId == productId && it.isRefill == isRefill } ?: return
-        viewModelScope.launch {
-            container.cartStore.setQuantity(productId, isRefill, line.quantity - 1)
-        }
+        viewModelScope.launch { container.cartStore.decrement(productId, isRefill) }
     }
 
     /** Held containers not yet spoken for by refill lines already in the cart. */

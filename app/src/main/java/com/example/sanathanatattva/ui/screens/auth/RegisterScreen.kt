@@ -1,5 +1,6 @@
 package com.example.sanathanatattva.ui.screens.auth
 
+import com.example.sanathanatattva.util.mobileDigits
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -116,7 +117,8 @@ fun RegisterScreen(navController: NavController, session: SessionViewModel) {
             )
             OutlinedTextField(
                 value = phone,
-                onValueChange = { phone = it; vm.clearMessages() },
+                onValueChange = { phone = mobileDigits(it); vm.clearMessages() },
+                prefix = { Text("+91 ") },
                 label = { Text("Phone (for delivery updates)") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),

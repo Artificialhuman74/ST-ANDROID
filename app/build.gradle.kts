@@ -30,8 +30,8 @@ android {
         applicationId = "com.sanathanatattva.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 5
-        versionName = "5.0"
+        versionCode = 7
+        versionName = "7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -64,9 +64,16 @@ android {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
-            optimization {
-                enable = false
-            }
+            // R8 shrinks, optimizes and obfuscates the release DEX (Play flags builds
+            // whose obfuscation falls under 25%). Libraries ship their own keep rules;
+            // app-specific ones live in src/main/keepRules. The mapping file is packed
+            // into the AAB, so Play still shows readable crash stack traces.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "src/main/keepRules/rules.keep",
+            )
             // Package native debug symbols (from Razorpay etc.) into the AAB so Play
             // can symbolicate native crashes/ANRs — clears the "no debug symbols" warning.
             ndk {

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -72,6 +73,13 @@ data class DockItem(
  * their bottom padding so nothing is trapped underneath it.
  */
 val DockContentClearance = 88.dp
+
+/**
+ * The dock's widest span. Four tabs sit comfortably under one thumb on a phone; on a
+ * tablet or in landscape the dock stays this size, centred, instead of stretching
+ * its tabs a hand's width apart. Bars that float with it (the shop's cart bar) match.
+ */
+val DockMaxWidth = 480.dp
 
 /**
  * A floating bottom navigation dock. The "liquid" is the motion, not the material:
@@ -135,10 +143,18 @@ fun LiquidDock(
     val scheme = MaterialTheme.colorScheme
     val onDarkGround = scheme.surface.luminance() < 0.5f
     val dockShape = RoundedCornerShape(28.dp)
-    Surface(
-        modifier = modifier
+    // The system bars are cleared first, so the capped dock centres in the usable
+    // width — a landscape side nav bar never pushes it off centre.
+    Box(
+        modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
+            .navigationBarsPadding(),
+        contentAlignment = Alignment.Center,
+    ) {
+    Surface(
+        modifier = Modifier
+            .widthIn(max = DockMaxWidth)
+            .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .shadow(
                 elevation = if (onDarkGround) 22.dp else 8.dp,
@@ -327,5 +343,6 @@ fun LiquidDock(
                 }
             }
         }
+    }
     }
 }

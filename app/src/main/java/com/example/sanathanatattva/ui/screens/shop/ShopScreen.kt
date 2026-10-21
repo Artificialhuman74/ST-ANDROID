@@ -39,10 +39,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -115,9 +118,11 @@ import com.example.sanathanatattva.data.model.Product
 import com.example.sanathanatattva.imageUrl
 import com.example.sanathanatattva.ui.appContainer
 import com.example.sanathanatattva.ui.components.DockContentClearance
+import com.example.sanathanatattva.ui.components.DockMaxWidth
 import com.example.sanathanatattva.ui.components.cardBorder
 import com.example.sanathanatattva.ui.components.EmptyState
 import com.example.sanathanatattva.ui.components.ErrorState
+import com.example.sanathanatattva.ui.components.ProductCellMinWidth
 import com.example.sanathanatattva.ui.components.SkeletonBlock
 import com.example.sanathanatattva.ui.components.TopSnackbarHost
 import com.example.sanathanatattva.ui.components.rememberReducedMotion
@@ -311,11 +316,15 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
             }
 
             when {
-                state.loading -> LazyColumn(
+                state.loading -> LazyVerticalGrid(
+                    columns = GridCells.Adaptive(ProductCellMinWidth),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item(key = "lucky_draw") { LuckyDrawShopCard(navController, session) }
+                    item(key = "lucky_draw", span = { GridItemSpan(maxLineSpan) }) {
+                        LuckyDrawShopCard(navController, session)
+                    }
                     items(4) {
                         SkeletonBlock(Modifier.fillMaxWidth(), height = 120.dp, corner = 16.dp)
                     }
@@ -332,7 +341,10 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                     body = "Try a different search word or category.",
                 )
 
-                else -> LazyColumn(
+                // One column on a phone; wider windows set products side by side
+                // instead of stretching each card across the screen.
+                else -> LazyVerticalGrid(
+                    columns = GridCells.Adaptive(ProductCellMinWidth),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
@@ -342,8 +354,11 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
                             if (totals.itemCount > 0) 72.dp else 0.dp,
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item(key = "lucky_draw") { LuckyDrawShopCard(navController, session) }
+                    item(key = "lucky_draw", span = { GridItemSpan(maxLineSpan) }) {
+                        LuckyDrawShopCard(navController, session)
+                    }
                     itemsIndexed(state.products, key = { _, p -> p.id }) { index, product ->
                         val staggerDelay = if (!playedEntrance) (index * 50).coerceAtMost(300) else 0
                         var visible by remember(product.id) { mutableStateOf(playedEntrance) }
@@ -1037,6 +1052,8 @@ fun CartBar(itemCount: Int, amount: Double, onClick: () -> Unit) {
         shape = RoundedCornerShape(20.dp),
         shadowElevation = 12.dp,
         modifier = Modifier
+            // Spans the same width as the dock it floats above.
+            .widthIn(max = DockMaxWidth)
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .padding(top = 12.dp, bottom = 6.dp)

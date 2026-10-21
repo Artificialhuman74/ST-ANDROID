@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.sanathanatattva.data.model.*
 import com.example.sanathanatattva.ui.components.ErrorState
+import com.example.sanathanatattva.ui.components.ReadableWidth
 import com.example.sanathanatattva.ui.components.rememberReducedMotion
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.navigation.openTab
@@ -172,6 +173,9 @@ private fun DrawContent(navController: NavController, session: SessionViewModel,
     val density = LocalDensity.current
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { rootOffset = it.positionInRoot() }) {
+        // Wide windows centre the page; the wheel's flight and the win moment below
+        // stay on the full-screen box, so the reveal remains full-bleed.
+        ReadableWidth {
         Scaffold(topBar = {
             TopAppBar(title = { Text(LUCKY_DRAW_NAME) }, navigationIcon = {
                 IconButton(enabled = !busy, onClick = { navController.popBackStack() }) {
@@ -219,6 +223,7 @@ private fun DrawContent(navController: NavController, session: SessionViewModel,
                         },
                 )
             }
+        }
         }
 
         // The one wheel in flight between the loader and the hero mark.

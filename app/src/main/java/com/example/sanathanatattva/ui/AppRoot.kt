@@ -45,7 +45,9 @@ import com.example.sanathanatattva.ui.brand.BrandSplash
 import com.example.sanathanatattva.ui.brand.CelebrationHost
 import com.example.sanathanatattva.ui.brand.rememberCelebrationController
 import com.example.sanathanatattva.ui.components.DockItem
+import com.example.sanathanatattva.ui.components.FormMaxWidth
 import com.example.sanathanatattva.ui.components.LiquidDock
+import com.example.sanathanatattva.ui.components.ReadableWidth
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.navigation.switchTab
 import com.example.sanathanatattva.ui.screens.account.AccountScreen
@@ -139,12 +141,14 @@ fun AppRoot() {
             popExitTransition = { tabFadeOut },
         ) {
             // ── Tab destinations (inherit fast fade from NavHost) ──────────────
-            composable(Routes.SHOP) { ShopScreen(navController, session) }
-            composable(Routes.ORDERS) { OrdersScreen(navController, session) }
-            composable(Routes.CONTAINERS) { ContainersScreen(navController, session) }
-            composable(Routes.ACCOUNT) { AccountScreen(navController, session) }
+            composable(Routes.SHOP) { ReadableWidth { ShopScreen(navController, session) } }
+            composable(Routes.ORDERS) { ReadableWidth { OrdersScreen(navController, session) } }
+            composable(Routes.CONTAINERS) { ReadableWidth { ContainersScreen(navController, session) } }
+            composable(Routes.ACCOUNT) { ReadableWidth { AccountScreen(navController, session) } }
 
             // ── Push destinations (slide in/out) ──────────────────────────────
+            // Every screen sits in a ReadableWidth column on wide windows, except the
+            // draw: its win moment is full-bleed, so it centres its own page instead.
             composable(
                 Routes.LUCKY_DRAW,
                 enterTransition = { pushEnter },
@@ -160,7 +164,7 @@ fun AppRoot() {
                 popExitTransition = { popExit },
             ) { entry ->
                 val id = entry.arguments?.getString("productId")?.toLongOrNull() ?: return@composable
-                ProductDetailScreen(navController, session, id)
+                ReadableWidth { ProductDetailScreen(navController, session, id) }
             }
             composable(
                 Routes.CART,
@@ -168,14 +172,14 @@ fun AppRoot() {
                 exitTransition = { pushExit },
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
-            ) { CartScreen(navController, session) }
+            ) { ReadableWidth { CartScreen(navController, session) } }
             composable(
                 Routes.CHECKOUT,
                 enterTransition = { pushEnter },
                 exitTransition = { pushExit },
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
-            ) { CheckoutScreen(navController, session, celebrate = celebrations::play) }
+            ) { ReadableWidth { CheckoutScreen(navController, session, celebrate = celebrations::play) } }
             composable(
                 Routes.ORDER_DETAIL,
                 enterTransition = { pushEnter },
@@ -184,7 +188,7 @@ fun AppRoot() {
                 popExitTransition = { popExit },
             ) { entry ->
                 val id = entry.arguments?.getString("orderId")?.toLongOrNull() ?: return@composable
-                OrderDetailScreen(navController, id)
+                ReadableWidth { OrderDetailScreen(navController, id) }
             }
             composable(
                 Routes.ADDRESSES,
@@ -192,35 +196,35 @@ fun AppRoot() {
                 exitTransition = { pushExit },
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
-            ) { AddressesScreen(navController) }
+            ) { ReadableWidth { AddressesScreen(navController) } }
             composable(
                 Routes.WALLET,
                 enterTransition = { pushEnter },
                 exitTransition = { pushExit },
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
-            ) { WalletScreen(navController) }
+            ) { ReadableWidth { WalletScreen(navController) } }
             composable(
                 Routes.LOGIN,
                 enterTransition = { pushEnter },
                 exitTransition = { pushExit },
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
-            ) { LoginScreen(navController, session, celebrate = celebrations::play) }
+            ) { ReadableWidth(FormMaxWidth) { LoginScreen(navController, session, celebrate = celebrations::play) } }
             composable(
                 Routes.REGISTER,
                 enterTransition = { pushEnter },
                 exitTransition = { pushExit },
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
-            ) { RegisterScreen(navController, session) }
+            ) { ReadableWidth(FormMaxWidth) { RegisterScreen(navController, session) } }
             composable(
                 Routes.VERIFY_PENDING,
                 enterTransition = { pushEnter },
                 exitTransition = { pushExit },
                 popEnterTransition = { popEnter },
                 popExitTransition = { popExit },
-            ) { VerifyPendingScreen(navController, session) }
+            ) { ReadableWidth(FormMaxWidth) { VerifyPendingScreen(navController, session) } }
         }
 
             if (showBottomBar) {

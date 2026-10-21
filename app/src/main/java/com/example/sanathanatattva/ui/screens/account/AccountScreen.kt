@@ -1,5 +1,7 @@
 package com.example.sanathanatattva.ui.screens.account
 
+import com.example.sanathanatattva.util.isMobile
+import com.example.sanathanatattva.util.mobileDigits
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -510,7 +512,9 @@ private fun PersonalDetailsSection(
 ) {
     // Reseed the editable fields once the profile loads (or the account changes).
     var name by remember(consumerKey) { mutableStateOf(initialName) }
-    var phone by remember(consumerKey) { mutableStateOf(initialPhone) }
+    // Stored numbers come in every shape; edit just the 10 digits behind a fixed +91.
+    var phone by remember(consumerKey) { mutableStateOf(mobileDigits(initialPhone)) }
+    var phoneError by remember { mutableStateOf<String?>(null) }
     var state by remember { mutableStateOf(SubmitState.Idle) }
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
@@ -537,10 +541,13 @@ private fun PersonalDetailsSection(
     Spacer(Modifier.height(12.dp))
     OutlinedTextField(
         value = phone,
-        onValueChange = { phone = it },
+        onValueChange = { phone = mobileDigits(it); phoneError = null },
         label = { Text("Phone number") },
-        placeholder = { Text("e.g. 9876543210") },
+        placeholder = { Text("98765 43210") },
+        prefix = { Text("+91 ") },
         singleLine = true,
+        isError = phoneError != null,
+        supportingText = phoneError?.let { { Text(it) } },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
         modifier = Modifier.fillMaxWidth(),
     )
@@ -552,9 +559,13 @@ private fun PersonalDetailsSection(
         enabled = name.isNotBlank(),
         reducedMotion = reducedMotion,
         onClick = {
+            if (phone.isNotEmpty() && !isMobile(phone)) {
+                phoneError = "Enter your 10-digit mobile number."
+                return@StatefulButton
+            }
             scope.launch {
                 state = SubmitState.Loading
-                onSave(name.trim(), phone.trim())
+                onSave(name.trim(), phone)
                     .onSuccess {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         state = SubmitState.Success

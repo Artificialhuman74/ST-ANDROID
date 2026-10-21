@@ -1,5 +1,6 @@
 package com.example.sanathanatattva.ui.screens.auth
 
+import com.example.sanathanatattva.util.mobileDigits
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -555,7 +556,7 @@ private fun PhonePane(loading: Boolean) {
         OutlinedTextField(
             value = phone,
             onValueChange = { new ->
-                phone = new.filter(Char::isDigit).take(10)
+                phone = mobileDigits(new)
                 fieldError = null
             },
             label = { Text("Mobile number") },

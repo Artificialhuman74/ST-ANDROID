@@ -1,5 +1,6 @@
 package com.example.sanathanatattva.ui.screens.checkout
 
+import com.example.sanathanatattva.util.mobileDigits
 import android.app.Activity
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -473,8 +474,9 @@ private fun InlineAddressForm(inline: InlineAddress, onChange: (InlineAddress) -
         )
         OutlinedTextField(
             value = inline.phone,
-            onValueChange = { onChange(inline.copy(phone = it)) },
+            onValueChange = { onChange(inline.copy(phone = mobileDigits(it))) },
             label = { Text("Phone") },
+            prefix = { Text("+91 ") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             modifier = Modifier.fillMaxWidth(),

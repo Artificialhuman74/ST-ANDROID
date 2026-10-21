@@ -51,21 +51,27 @@ class CartStore(private val context: Context) {
     private val cartKey = stringPreferencesKey("cart_lines")
     private val json = Json { ignoreUnknownKeys = true }
 
-    val lines: Flow<List<CartLine>> = context.cartDataStore.data.map { prefs ->
-        prefs[cartKey]?.let {
-            runCatching { json.decodeFromString<List<CartLine>>(it) }.getOrDefault(emptyList())
-        } ?: emptyList()
-    }
+    val lines: Flow<List<CartLine>> = context.cartDataStore.data.map { prefs -> decode(prefs[cartKey]) }
 
     suspend fun current(): List<CartLine> = lines.first()
 
-    private suspend fun write(newLines: List<CartLine>) {
-        context.cartDataStore.edit { it[cartKey] = json.encodeToString(newLines) }
+    private fun decode(raw: String?): List<CartLine> =
+        raw?.let { runCatching { json.decodeFromString<List<CartLine>>(it) }.getOrDefault(emptyList()) } ?: emptyList()
+
+    /**
+     * Read-modify-write inside one DataStore transaction, so quick repeated taps
+     * on + never read the same old cart and drop an increment.
+     */
+    private suspend fun update(change: (MutableList<CartLine>) -> Unit) {
+        context.cartDataStore.edit { prefs ->
+            val lines = decode(prefs[cartKey]).toMutableList()
+            change(lines)
+            prefs[cartKey] = json.encodeToString(lines.toList())
+        }
     }
 
     /** Adds one unit of the product. Buy and refill are separate lines. */
-    suspend fun add(product: Product, isRefill: Boolean) {
-        val lines = current().toMutableList()
+    suspend fun add(product: Product, isRefill: Boolean) = update { lines ->
         val idx = lines.indexOfFirst { it.productId == product.id && it.isRefill == isRefill }
         if (idx >= 0) {
             lines[idx] = lines[idx].copy(quantity = lines[idx].quantity + 1)
@@ -82,22 +88,32 @@ class CartStore(private val context: Context) {
                 isRefill = isRefill,
             )
         }
-        write(lines)
     }
 
-    suspend fun setQuantity(productId: Long, isRefill: Boolean, quantity: Int) {
-        val lines = current().toMutableList()
+    suspend fun setQuantity(productId: Long, isRefill: Boolean, quantity: Int) = update { lines ->
         val idx = lines.indexOfFirst { it.productId == productId && it.isRefill == isRefill }
-        if (idx < 0) return
-        if (quantity <= 0) lines.removeAt(idx)
-        else lines[idx] = lines[idx].copy(quantity = quantity)
-        write(lines)
+        if (idx >= 0) {
+            if (quantity <= 0) lines.removeAt(idx)
+            else lines[idx] = lines[idx].copy(quantity = quantity)
+        }
+    }
+
+    /** Takes one unit off a line atomically; drops the line at zero. */
+    suspend fun decrement(productId: Long, isRefill: Boolean) = update { lines ->
+        val idx = lines.indexOfFirst { it.productId == productId && it.isRefill == isRefill }
+        if (idx >= 0) {
+            val q = lines[idx].quantity - 1
+            if (q <= 0) lines.removeAt(idx) else lines[idx] = lines[idx].copy(quantity = q)
+        }
     }
 
     /** Switches a line between buy and refill, merging with an existing counterpart line. */
     suspend fun setRefill(productId: Long, fromRefill: Boolean, toRefill: Boolean) {
         if (fromRefill == toRefill) return
-        val lines = current().toMutableList()
+        update { lines -> moveLine(lines, productId, fromRefill, toRefill) }
+    }
+
+    private fun moveLine(lines: MutableList<CartLine>, productId: Long, fromRefill: Boolean, toRefill: Boolean) {
         val idx = lines.indexOfFirst { it.productId == productId && it.isRefill == fromRefill }
         if (idx < 0) return
         val moving = lines.removeAt(idx)
@@ -107,7 +123,6 @@ class CartStore(private val context: Context) {
         } else {
             lines += moving.copy(isRefill = toRefill)
         }
-        write(lines)
     }
 
     suspend fun clear() {

@@ -88,6 +88,9 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
             password.length < 6 -> {
                 state.value = state.value.copy(error = "Password needs at least 6 characters."); return
             }
+            phone.isNotBlank() && !com.example.sanathanatattva.util.isMobile(phone) -> {
+                state.value = state.value.copy(error = "Enter your 10-digit mobile number."); return
+            }
         }
         state.value = state.value.copy(loading = true, error = null)
         viewModelScope.launch {

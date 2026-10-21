@@ -1,5 +1,6 @@
 package com.example.sanathanatattva.ui.screens.account
 
+import com.example.sanathanatattva.util.mobileDigits
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -301,7 +302,7 @@ private fun AddressFormDialog(
 ) {
     var label by remember { mutableStateOf(existing?.label ?: "Home") }
     var name by remember { mutableStateOf(existing?.name.orEmpty()) }
-    var phone by remember { mutableStateOf(existing?.phone.orEmpty()) }
+    var phone by remember { mutableStateOf(mobileDigits(existing?.phone.orEmpty())) }
     var address by remember { mutableStateOf(existing?.address.orEmpty()) }
     var pincode by remember { mutableStateOf(existing?.pincode.orEmpty()) }
 
@@ -321,8 +322,9 @@ private fun AddressFormDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
-                    value = phone, onValueChange = { phone = it },
+                    value = phone, onValueChange = { phone = mobileDigits(it) },
                     label = { Text("Phone") }, singleLine = true,
+                    prefix = { Text("+91 ") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth(),
                 )

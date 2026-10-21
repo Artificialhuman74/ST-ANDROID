@@ -1,5 +1,10 @@
 package com.example.sanathanatattva.ui.screens.product
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.TextButton
+import com.example.sanathanatattva.ui.components.CartStepper
+import com.example.sanathanatattva.ui.navigation.Routes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +74,7 @@ fun ProductDetailScreen(
     val vm: ProductDetailViewModel = viewModel { ProductDetailViewModel(container, productId) }
     val state by vm.state.collectAsState()
     val isLoggedIn by session.isLoggedIn.collectAsState()
+    val cartLines by vm.cartLines.collectAsState()
 
     Scaffold(
         topBar = {
@@ -216,22 +222,36 @@ fun ProductDetailScreen(
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                } else if (state.refillRemaining > 0) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
-                            onClick = { vm.addToCart(true); navController.popBackStack() },
-                            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                        ) { Text("Add refill") }
-                        FilledTonalButton(
-                            onClick = { vm.addToCart(false); navController.popBackStack() },
-                            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                        ) { Text("Buy with container") }
-                    }
                 } else {
-                    Button(
-                        onClick = { vm.addToCart(false); navController.popBackStack() },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                    ) { Text("Add to cart") }
+                    val buyInCart = cartLines.filter { !it.isRefill }.sumOf { it.quantity }
+                    val refillInCart = cartLines.filter { it.isRefill }.sumOf { it.quantity }
+                    val refillRemaining = (state.heldCount - refillInCart).coerceAtLeast(0)
+                    // Same controls as the shop list, already showing what's in the cart.
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (refillRemaining > 0 || refillInCart > 0) {
+                            CartStepper(
+                                label = "Refill",
+                                count = refillInCart,
+                                canIncrement = refillRemaining > 0,
+                                onIncrement = { vm.addToCart(true) },
+                                onDecrement = { vm.removeFromCart(true) },
+                            )
+                        }
+                        CartStepper(
+                            label = if (state.heldCount > 0) "Buy with container" else "Add to cart",
+                            count = buyInCart,
+                            tonal = state.heldCount > 0,
+                            onIncrement = { vm.addToCart(false) },
+                            onDecrement = { vm.removeFromCart(false) },
+                        )
+                        AnimatedVisibility(visible = buyInCart + refillInCart > 0) {
+                            TextButton(onClick = { navController.navigate(Routes.CART) }) {
+                                Text("In your cart: ${buyInCart + refillInCart} · View cart")
+                                Spacer(Modifier.width(4.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
                 }
 
                 product.description?.takeIf { it.isNotBlank() }?.let { desc ->

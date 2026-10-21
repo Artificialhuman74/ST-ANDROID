@@ -97,7 +97,9 @@ import com.example.sanathanatattva.data.apiCall
 import com.example.sanathanatattva.data.model.ChangePasswordRequest
 import com.example.sanathanatattva.data.model.UpdateProfileRequest
 import com.example.sanathanatattva.ui.appContainer
+import com.example.sanathanatattva.ui.components.Haptic
 import com.example.sanathanatattva.ui.components.DockContentClearance
+import com.example.sanathanatattva.ui.components.rememberHaptics
 import com.example.sanathanatattva.ui.components.EaseOutQuint
 import com.example.sanathanatattva.ui.components.EmptyState
 import com.example.sanathanatattva.ui.components.SkeletonBlock
@@ -122,6 +124,7 @@ fun AccountScreen(navController: NavController, session: SessionViewModel) {
 
     var editProfile by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
+    val buzz = rememberHaptics()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
 
@@ -280,7 +283,10 @@ fun AccountScreen(navController: NavController, session: SessionViewModel) {
                 AccountLink(
                     icon = Icons.AutoMirrored.Outlined.Logout,
                     label = "Log out",
-                    onClick = { confirmLogout = true },
+                    onClick = {
+                        buzz(Haptic.Tick)
+                        confirmLogout = true
+                    },
                     container = MaterialTheme.colorScheme.surfaceContainerHighest,
                     content = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -304,6 +310,7 @@ fun AccountScreen(navController: NavController, session: SessionViewModel) {
             text = { Text("Your cart stays on this phone. You can log back in any time.") },
             confirmButton = {
                 Button(onClick = {
+                    buzz(Haptic.Settle)
                     confirmLogout = false
                     session.logout()
                 }) { Text("Log out") }

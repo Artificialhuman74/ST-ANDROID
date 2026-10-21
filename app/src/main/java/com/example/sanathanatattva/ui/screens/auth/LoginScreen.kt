@@ -100,7 +100,9 @@ import com.example.sanathanatattva.ui.appContainer
 import com.example.sanathanatattva.ui.brand.SealMoment
 import com.example.sanathanatattva.ui.brand.SealOrigin
 import com.example.sanathanatattva.ui.brand.signInMoment
+import com.example.sanathanatattva.ui.components.Haptic
 import com.example.sanathanatattva.ui.components.rememberReducedMotion
+import com.example.sanathanatattva.ui.components.rememberHaptics
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
 import com.example.sanathanatattva.ui.theme.Green100
@@ -134,6 +136,7 @@ fun LoginScreen(
     val outcome by vm.outcome.collectAsState()
     val context = LocalContext.current
     val reducedMotion = rememberReducedMotion()
+    val buzz = rememberHaptics()
 
     var tab by rememberSaveable { mutableIntStateOf(TAB_EMAIL) }
     var email by rememberSaveable { mutableStateOf("") }
@@ -151,9 +154,15 @@ fun LoginScreen(
     )
     val buttonFill = MaterialTheme.colorScheme.primary
 
+    // Wrong password or a failed Google sign-in: a double buzz with the message.
+    LaunchedEffect(state.error) {
+        if (state.error != null) buzz(Haptic.Reject)
+    }
+
     LaunchedEffect(outcome) {
         when (val o = outcome) {
             is AuthOutcome.LoggedIn -> {
+                buzz(Haptic.Confirm)
                 session.onLoggedIn(o.token, o.consumer)
                 vm.consumeOutcome()
                 val origin = if (source == SignInSource.Google) googleButtonBounds else emailButtonBounds
@@ -285,6 +294,7 @@ fun LoginScreen(
             GoogleSignInButton(
                 loading = state.loading,
                 onClick = {
+                    buzz(Haptic.Tick)
                     source = SignInSource.Google
                     vm.signInWithGoogle(context)
                 },
@@ -490,6 +500,7 @@ private fun EmailPane(
 ) {
     var password by rememberSaveable { mutableStateOf("") }
     var showPassword by rememberSaveable { mutableStateOf(false) }
+    val buzz = rememberHaptics()
 
     // Passwordless email OTP login isn't implemented on the backend yet (the
     // send-otp/verify-otp endpoints 404), so email login is password-based.
@@ -532,6 +543,7 @@ private fun EmailPane(
             text = "Log in",
             loading = state.loading,
             onClick = {
+                buzz(Haptic.Tick)
                 onSubmit()
                 vm.login(email, password)
             },
@@ -551,6 +563,7 @@ private fun PhonePane(loading: Boolean) {
     var phone by rememberSaveable { mutableStateOf("") }
     var fieldError by rememberSaveable { mutableStateOf<String?>(null) }
     var comingSoon by rememberSaveable { mutableStateOf(false) }
+    val buzz = rememberHaptics()
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         OutlinedTextField(
@@ -576,8 +589,10 @@ private fun PhonePane(loading: Boolean) {
             loading = loading,
             onClick = {
                 if (phone.length != 10) {
+                    buzz(Haptic.Reject)
                     fieldError = "Enter your 10-digit mobile number."
                 } else {
+                    buzz(Haptic.Tick)
                     comingSoon = true
                 }
             },

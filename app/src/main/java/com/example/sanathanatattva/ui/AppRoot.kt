@@ -22,7 +22,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +43,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.sanathanatattva.App
 import com.example.sanathanatattva.AppContainer
+import com.example.sanathanatattva.data.UpdateOffer
+import com.example.sanathanatattva.data.checkForUpdate
 import com.example.sanathanatattva.ui.brand.BrandSplash
 import com.example.sanathanatattva.ui.brand.CelebrationHost
 import com.example.sanathanatattva.ui.brand.rememberCelebrationController
@@ -64,6 +68,7 @@ import com.example.sanathanatattva.ui.screens.orders.OrdersScreen
 import com.example.sanathanatattva.ui.screens.product.ProductDetailScreen
 import com.example.sanathanatattva.ui.screens.shop.ShopScreen
 import com.example.sanathanatattva.ui.screens.luckydraw.LuckyDrawScreen
+import com.example.sanathanatattva.ui.screens.update.UpdateScreen
 import com.example.sanathanatattva.ui.session.SessionViewModel
 
 @Composable
@@ -102,6 +107,20 @@ fun AppRoot() {
     val tabBounds = remember { mutableStateMapOf<String, Rect>() }
     // The splash plays once per launch — not again on rotation or a theme change.
     var showSplash by rememberSaveable { mutableStateOf(true) }
+
+    // A newer version on the Play Store is offered right after the splash, once per launch.
+    // An optional one that's slow to be known isn't sprung on someone already shopping;
+    // a required one (below the server's minimum) always shows.
+    val context = LocalContext.current
+    var update by remember { mutableStateOf<UpdateOffer?>(null) }
+    var updateDone by rememberSaveable { mutableStateOf(false) }
+    var splashEndedAt by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        if (updateDone) return@LaunchedEffect
+        val offer = checkForUpdate(context.applicationContext, container.api)
+        val late = splashEndedAt > 0 && System.currentTimeMillis() - splashEndedAt > 2_000
+        if (offer != null && (offer.required || !late)) update = offer else updateDone = true
+    }
 
     // Each screen owns its scaffold and insets; the root supplies only the background.
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -247,7 +266,15 @@ fun AppRoot() {
                 },
             )
 
-            if (showSplash) BrandSplash(onFinished = { showSplash = false })
+            val offer = update
+            if (!showSplash && offer != null && !updateDone) {
+                UpdateScreen(offer, onLater = { updateDone = true })
+            }
+
+            if (showSplash) BrandSplash(onFinished = {
+                showSplash = false
+                splashEndedAt = System.currentTimeMillis()
+            })
         }
     }
 }

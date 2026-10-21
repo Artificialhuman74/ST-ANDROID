@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.sanathanatattva.ui.appContainer
+import com.example.sanathanatattva.ui.components.Haptic
+import com.example.sanathanatattva.ui.components.rememberHaptics
 import com.example.sanathanatattva.ui.navigation.Routes
 import com.example.sanathanatattva.ui.session.SessionViewModel
 
@@ -49,10 +51,17 @@ fun VerifyPendingScreen(navController: NavController, session: SessionViewModel)
     val email by session.pendingVerificationEmail.collectAsState()
 
     var otp by remember { mutableStateOf("") }
+    val buzz = rememberHaptics()
+
+    // Wrong or expired code: a double buzz with the message.
+    LaunchedEffect(state.error) {
+        if (state.error != null) buzz(Haptic.Reject)
+    }
 
     LaunchedEffect(outcome) {
         when (val o = outcome) {
             is AuthOutcome.LoggedIn -> {
+                buzz(Haptic.Confirm)
                 session.onLoggedIn(o.token, o.consumer)
                 session.pendingVerificationEmail.value = null
                 vm.consumeOutcome()
@@ -115,7 +124,10 @@ fun VerifyPendingScreen(navController: NavController, session: SessionViewModel)
 
         Spacer(Modifier.height(20.dp))
         Button(
-            onClick = { vm.verifyOtp(targetEmail, otp) },
+            onClick = {
+                buzz(Haptic.Tick)
+                vm.verifyOtp(targetEmail, otp)
+            },
             enabled = !state.loading && otp.length == 6,
             modifier = Modifier
                 .fillMaxWidth()

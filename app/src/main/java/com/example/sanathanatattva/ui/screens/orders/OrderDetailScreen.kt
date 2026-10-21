@@ -30,10 +30,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,9 +69,21 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
     val container = appContainer()
     val vm: OrderDetailViewModel = viewModel { OrderDetailViewModel(container, orderId) }
     val state by vm.state.collectAsState()
+    val callEvent by vm.callEvents.collectAsState()
     val context = LocalContext.current
+    val snackbar = remember { SnackbarHostState() }
+
+    LaunchedEffect(callEvent) {
+        when (val e = callEvent) {
+            is CallEvent.Dial -> context.startActivity(Intent(Intent.ACTION_DIAL, "tel:${e.phone}".toUri()))
+            is CallEvent.Failed -> snackbar.showSnackbar(e.message)
+            null -> return@LaunchedEffect
+        }
+        vm.consumeCall()
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = {
@@ -109,9 +125,22 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // ---- Status timeline ----
+                // ---- Live tracking: where it is, who has it, what happened ----
+                // Needs the server's history (Oct 2026); an older server keeps today's cards.
+                val tracking = state.tracking?.takeIf { it.events.isNotEmpty() }
+                if (tracking != null) {
+                    LiveTrackingSection(
+                        tracking = tracking,
+                        trackedAt = state.trackedAt,
+                        route = state.route,
+                        calling = state.calling,
+                        onCall = vm::call,
+                    )
+                }
                 LuckyDrawOrderBadge(order.order_number)
-                Card(
+
+                // Older servers without tracking: the plain status steps and "Delivered by".
+                if (tracking == null) Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                     ),
@@ -149,7 +178,7 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
                 // ---- Delivery person ----
                 val deliveryName = order.delivery_dealer_name ?: order.dealer_name
                 val deliveryPhone = order.delivery_dealer_phone ?: order.dealer_phone
-                if (deliveryName != null) {
+                if (tracking == null && deliveryName != null) {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,

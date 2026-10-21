@@ -30,8 +30,8 @@ android {
         applicationId = "com.sanathanatattva.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "7.1"
+        versionCode = 9
+        versionName = "7.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -117,6 +117,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.maplibre.android)
+    implementation(libs.play.app.update)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))

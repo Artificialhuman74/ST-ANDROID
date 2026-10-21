@@ -141,6 +141,19 @@ interface ApiService {
     @GET("api/consumer/orders/{id}")
     suspend fun order(@Path("id") id: Long): OrderDetailResponse
 
+    @GET("api/consumer/orders/{id}/tracking")
+    suspend fun tracking(@Path("id") id: Long): OrderTracking
+
+    @GET("api/consumer/orders/{id}/call")
+    suspend fun callNumber(@Path("id") id: Long): CallResponse
+
+    /** Road line for the live map: from=lat,lng&to=lat,lng (our OSRM). */
+    @GET("api/route")
+    suspend fun route(@Query("from") from: String, @Query("to") to: String): RoutePoints
+
+    @GET("api/public/app-version")
+    suspend fun appVersions(): AppVersions
+
     @DELETE("api/consumer/orders/{id}")
     suspend fun deleteUnpaidOrder(@Path("id") id: Long): SuccessResponse
 

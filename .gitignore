@@ -21,3 +21,6 @@ local.properties
 
 # Kotlin compiler caches
 .kotlin/
+
+# Release bundles (release.sh keeps a copy of each upload here)
+/dist

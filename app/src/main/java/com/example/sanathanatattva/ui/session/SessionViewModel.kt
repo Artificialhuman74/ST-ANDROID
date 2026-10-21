@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sanathanatattva.AppContainer
 import com.example.sanathanatattva.data.apiCall
+import com.example.sanathanatattva.data.cache.ApiCache
 import com.example.sanathanatattva.data.model.Consumer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -59,6 +60,7 @@ class SessionViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             container.tokenStore.clear()
             _consumer.value = null
+            ApiCache.PERSONAL.forEach { container.cache.clear(it) }
         }
     }
 }

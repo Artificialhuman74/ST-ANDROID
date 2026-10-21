@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sanathanatattva.AppContainer
 import com.example.sanathanatattva.data.apiCall
+import com.example.sanathanatattva.data.cache.ApiCache
 import com.example.sanathanatattva.data.cart.CartLine
 import com.example.sanathanatattva.data.model.Product
+import com.example.sanathanatattva.data.model.ProductsResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +16,8 @@ import kotlinx.coroutines.launch
 
 data class ShopUiState(
     val loading: Boolean = true,
+    /** A pull-to-refresh is in flight (the list stays up meanwhile). */
+    val refreshing: Boolean = false,
     val error: String? = null,
     val products: List<Product> = emptyList(),
     val categories: List<String> = emptyList(),
@@ -64,23 +68,57 @@ class ShopViewModel(private val container: AppContainer) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
-        load()
+        open()
     }
 
-    /** Loads the whole catalogue once; filtering happens locally (see [visibleProducts]). */
-    fun load() {
-        state.value = state.value.copy(loading = state.value.products.isEmpty(), error = null)
+    /**
+     * The catalogue saved on the phone draws at once; the server is asked again only
+     * when that copy is over 3 hours old. Product pages and checkout read live prices
+     * and stock, so a saved catalogue never lets a stale price through.
+     */
+    private fun open() {
+        viewModelScope.launch {
+            val saved = container.cache.read(ApiCache.CATALOGUE, ProductsResponse.serializer())
+            if (saved != null) {
+                state.value = state.value.copy(
+                    loading = false,
+                    products = saved.value.products,
+                    categories = saved.value.categories,
+                )
+            }
+            if (saved?.isFresh == true) refreshCaps() else load()
+        }
+    }
+
+    /**
+     * Loads the whole catalogue from the server; filtering happens locally (see
+     * [visibleProducts]). [pulled] shows the pull-to-refresh spinner while it runs.
+     */
+    fun load(pulled: Boolean = false) {
+        state.value = state.value.copy(
+            loading = state.value.products.isEmpty(),
+            refreshing = pulled,
+            error = null,
+        )
         viewModelScope.launch {
             apiCall { container.api.products(search = null, category = null) }
                 .onSuccess { res ->
                     state.value = state.value.copy(
                         loading = false,
+                        refreshing = false,
                         products = res.products,
                         categories = res.categories,
                     )
+                    container.cache.write(ApiCache.CATALOGUE, ProductsResponse.serializer(), res)
                 }
                 .onFailure { e ->
-                    state.value = state.value.copy(loading = false, error = e.message)
+                    // A failed refresh keeps the saved catalogue up; the error page is
+                    // only for when there's nothing to show.
+                    state.value = state.value.copy(
+                        loading = false,
+                        refreshing = false,
+                        error = e.message.takeIf { state.value.products.isEmpty() },
+                    )
                 }
             refreshCaps()
         }

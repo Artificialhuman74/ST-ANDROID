@@ -88,7 +88,7 @@ fun ContainersScreen(navController: NavController, session: SessionViewModel) {
     var disputeTarget by remember { mutableStateOf<ContainerHolding?>(null) }
 
     LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn == true) vm.load()
+        if (isLoggedIn == true) vm.open()
     }
     LaunchedEffect(state.actionMessage) {
         state.actionMessage?.let {
@@ -120,7 +120,7 @@ fun ContainersScreen(navController: NavController, session: SessionViewModel) {
 
             state.error != null -> ErrorState(
                 message = state.error!!,
-                onRetry = vm::load,
+                onRetry = { vm.load() },
                 modifier = Modifier.padding(padding),
             )
 
@@ -143,7 +143,7 @@ fun ContainersScreen(navController: NavController, session: SessionViewModel) {
                         } else null,
                     )
                 } else {
-                    PullToRefreshBox(isRefreshing = state.loading, onRefresh = vm::load) {
+                    PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = { vm.load(pulled = true) }) {
                         LazyColumn(
                             contentPadding = PaddingValues(
                                 start = 16.dp,

@@ -10,6 +10,7 @@ import com.example.sanathanatattva.data.api.ApiClient
 import java.nio.ByteBuffer
 import com.example.sanathanatattva.data.api.ApiService
 import com.example.sanathanatattva.data.auth.TokenStore
+import com.example.sanathanatattva.data.cache.ApiCache
 import com.example.sanathanatattva.data.cart.CartStore
 import com.example.sanathanatattva.data.prefs.ContainerPrefsStore
 
@@ -19,6 +20,7 @@ class AppContainer(app: Application) {
     val cartStore = CartStore(app)
     val containerPrefs = ContainerPrefsStore(app)
     val luckyDrawPrefs = com.example.sanathanatattva.data.prefs.LuckyDrawPrefsStore(app)
+    val cache = ApiCache(app)
     val api: ApiService = ApiClient.create(tokenStore).create(ApiService::class.java)
 }
 

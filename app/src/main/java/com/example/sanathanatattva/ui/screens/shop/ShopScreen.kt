@@ -69,6 +69,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -374,7 +375,7 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
 
                 state.error != null -> ErrorState(
                     message = state.error!!,
-                    onRetry = vm::load,
+                    onRetry = { vm.load() },
                 )
 
                 visible.isEmpty() -> EmptyState(
@@ -385,69 +386,78 @@ fun ShopScreen(navController: NavController, session: SessionViewModel) {
 
                 // One column on a phone; wider windows set products side by side
                 // instead of stretching each card across the screen.
-                else -> LazyVerticalGrid(
-                    columns = GridCells.Adaptive(ProductCellMinWidth),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 4.dp,
-                        // Clear the floating dock, plus the cart bar when it's showing.
-                        bottom = 16.dp + DockContentClearance +
-                            if (totals.itemCount > 0) 72.dp else 0.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                // Pull down to ask the server for the catalogue now, ahead of the
+                // 3-hour refresh.
+                else -> PullToRefreshBox(
+                    isRefreshing = state.refreshing,
+                    onRefresh = { vm.load(pulled = true) },
                 ) {
-                    item(key = "lucky_draw", span = { GridItemSpan(maxLineSpan) }) {
-                        LuckyDrawShopCard(navController, session)
-                    }
-                    itemsIndexed(visible, key = { _, p -> p.id }) { index, product ->
-                        val staggerDelay = if (!playedEntrance) (index * 50).coerceAtMost(300) else 0
-                        var shown by remember(product.id) { mutableStateOf(playedEntrance) }
-                        LaunchedEffect(product.id) {
-                            if (!playedEntrance) {
-                                kotlinx.coroutines.delay(staggerDelay.toLong())
-                                shown = true
-                            }
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(ProductCellMinWidth),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 4.dp,
+                            // Clear the floating dock, plus the cart bar when it's showing.
+                            bottom = 16.dp + DockContentClearance +
+                                if (totals.itemCount > 0) 72.dp else 0.dp,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        item(key = "lucky_draw", span = { GridItemSpan(maxLineSpan) }) {
+                            LuckyDrawShopCard(navController, session)
                         }
-                        AnimatedVisibility(
-                            visible = shown,
-                            // Glides to its new place when the search, category or sort changes.
-                            modifier = Modifier.animateItem(),
-                            enter = fadeIn(tween(280)) + slideInVertically(
-                                initialOffsetY = { it / 4 },
-                                animationSpec = tween(280, easing = FastOutSlowInEasing),
-                            ),
-                        ) {
-                            ProductCard(
-                                product = product,
-                                heldCount = state.refillCaps[product.id] ?: 0,
-                                refillRemaining = vm.refillRemaining(product.id),
-                                buyInCart = cartLines
-                                    .filter { it.productId == product.id && !it.isRefill }
-                                    .sumOf { it.quantity },
-                                refillInCart = cartLines
-                                    .filter { it.productId == product.id && it.isRefill }
-                                    .sumOf { it.quantity },
-                                isLoggedIn = isLoggedIn == true,
-                                onOpen = { navController.navigate(Routes.product(product.id)) },
-                                onRemove = { refill -> vm.removeFromCart(product.id, refill) },
-                                onAdd = { refill ->
-                                    vm.addToCart(product, refill)
-                                    // Refill reuses a held container — celebrate the
-                                    // deposit the customer just kept (gold = money).
-                                    val deposit = product.container_cost
-                                    if (refill && deposit != null && deposit > 0.0) {
-                                        scope.launch {
-                                            snackbarHostState.currentSnackbarData?.dismiss()
-                                            snackbarHostState.showSnackbar(
-                                                message = refillSavingMessage(deposit),
-                                                duration = SnackbarDuration.Short,
-                                            )
+                        itemsIndexed(visible, key = { _, p -> p.id }) { index, product ->
+                            val staggerDelay = if (!playedEntrance) (index * 50).coerceAtMost(300) else 0
+                            var shown by remember(product.id) { mutableStateOf(playedEntrance) }
+                            LaunchedEffect(product.id) {
+                                if (!playedEntrance) {
+                                    kotlinx.coroutines.delay(staggerDelay.toLong())
+                                    shown = true
+                                }
+                            }
+                            // Named in full: inside the pull box Kotlin would otherwise pick
+                            // the outer Column's AnimatedVisibility overload.
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = shown,
+                                // Glides to its new place when the search, category or sort changes.
+                                modifier = Modifier.animateItem(),
+                                enter = fadeIn(tween(280)) + slideInVertically(
+                                    initialOffsetY = { it / 4 },
+                                    animationSpec = tween(280, easing = FastOutSlowInEasing),
+                                ),
+                            ) {
+                                ProductCard(
+                                    product = product,
+                                    heldCount = state.refillCaps[product.id] ?: 0,
+                                    refillRemaining = vm.refillRemaining(product.id),
+                                    buyInCart = cartLines
+                                        .filter { it.productId == product.id && !it.isRefill }
+                                        .sumOf { it.quantity },
+                                    refillInCart = cartLines
+                                        .filter { it.productId == product.id && it.isRefill }
+                                        .sumOf { it.quantity },
+                                    isLoggedIn = isLoggedIn == true,
+                                    onOpen = { navController.navigate(Routes.product(product.id)) },
+                                    onRemove = { refill -> vm.removeFromCart(product.id, refill) },
+                                    onAdd = { refill ->
+                                        vm.addToCart(product, refill)
+                                        // Refill reuses a held container — celebrate the
+                                        // deposit the customer just kept (gold = money).
+                                        val deposit = product.container_cost
+                                        if (refill && deposit != null && deposit > 0.0) {
+                                            scope.launch {
+                                                snackbarHostState.currentSnackbarData?.dismiss()
+                                                snackbarHostState.showSnackbar(
+                                                    message = refillSavingMessage(deposit),
+                                                    duration = SnackbarDuration.Short,
+                                                )
+                                            }
                                         }
-                                    }
-                                },
-                            )
+                                    },
+                                )
+                            }
                         }
                     }
                 }

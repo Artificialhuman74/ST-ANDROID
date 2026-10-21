@@ -94,7 +94,7 @@ fun OrdersScreen(navController: NavController, session: SessionViewModel) {
 
             state.error != null && state.orders.isEmpty() -> ErrorState(
                 message = state.error!!,
-                onRetry = vm::load,
+                onRetry = { vm.load() },
                 modifier = Modifier.padding(padding),
             )
 
@@ -108,8 +108,8 @@ fun OrdersScreen(navController: NavController, session: SessionViewModel) {
             )
 
             else -> PullToRefreshBox(
-                isRefreshing = state.loading,
-                onRefresh = vm::load,
+                isRefreshing = state.refreshing,
+                onRefresh = { vm.load(pulled = true) },
                 modifier = Modifier.padding(padding),
             ) {
                 LazyColumn(

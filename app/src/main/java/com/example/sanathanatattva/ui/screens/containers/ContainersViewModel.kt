@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sanathanatattva.AppContainer
 import com.example.sanathanatattva.data.apiCall
+import com.example.sanathanatattva.data.cache.ApiCache
+import com.example.sanathanatattva.data.cache.isFresh
 import com.example.sanathanatattva.data.model.ContainerHolding
 import com.example.sanathanatattva.data.model.DisputeRequest
 import com.example.sanathanatattva.data.model.RefundRequest
@@ -14,9 +16,12 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 
 data class ContainersUiState(
     val loading: Boolean = true,
+    /** A pull-to-refresh is in flight (the list stays up meanwhile). */
+    val refreshing: Boolean = false,
     val error: String? = null,
     val held: List<ContainerHolding> = emptyList(),
     val history: List<ContainerHolding> = emptyList(),
@@ -26,6 +31,20 @@ data class ContainersUiState(
     val rewardRoundActive: Boolean? = null,
 )
 
+/** What the tab shows, as saved on the phone between visits. */
+@Serializable
+data class ContainersSnapshot(
+    val held: List<ContainerHolding> = emptyList(),
+    val history: List<ContainerHolding> = emptyList(),
+    val swappable: List<SwappableProduct> = emptyList(),
+    val rewardRoundActive: Boolean? = null,
+)
+
+/**
+ * Containers only change when an order is delivered or the customer acts on one, so the
+ * tab opens from the copy saved on the phone and asks the server again after 3 hours.
+ * Acting on a container, or pulling down, always refreshes.
+ */
 class ContainersViewModel(private val container: AppContainer) : ViewModel() {
 
     val state = MutableStateFlow(ContainersUiState())
@@ -39,30 +58,87 @@ class ContainersViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { container.containerPrefs.markSteelSheetSeen() }
     }
 
-    fun load() {
-        state.value = state.value.copy(loading = true, error = null)
+    /** Whose containers are on screen, and when that answer came from the server. */
+    private var shownFor: String? = null
+    private var shownSavedAt = 0L
+
+    /** Opening the tab: draws what's saved, and asks the server only once that's 3 hours old. */
+    fun open() {
         viewModelScope.launch {
-            if (container.tokenStore.current() == null) {
+            val owner = ApiCache.ownerOf(container.tokenStore.current())
+            if (owner == null) {
+                shownFor = null
                 state.value = ContainersUiState(loading = false)
                 return@launch
             }
-            apiCall { container.api.containers() }
-                .onSuccess { res ->
-                    val rewardRoundActive = if (res.held.any { it.source == "lucky_draw_reward" }) {
-                        apiCall { container.api.luckyDrawStatus() }.getOrNull()?.let { it.enrollment != null }
-                    } else false
-                    state.value = state.value.copy(
-                        loading = false,
-                        held = res.held,
-                        history = res.history,
-                        swappable = res.swappable,
-                        rewardRoundActive = rewardRoundActive,
-                    )
+            if (owner == shownFor && isFresh(shownSavedAt)) return@launch
+            if (owner != shownFor) {
+                val saved = container.cache.read(ApiCache.CONTAINERS, ContainersSnapshot.serializer(), owner)
+                if (saved == null) {
+                    state.value = ContainersUiState()
+                } else {
+                    show(saved.value, owner, saved.savedAt)
+                    if (saved.isFresh) return@launch
                 }
-                .onFailure { e ->
-                    state.value = state.value.copy(loading = false, error = e.message)
-                }
+            }
+            fetch(owner, pulled = false)
         }
+    }
+
+    /** Asks the server now: retry, pull-to-refresh, and after any action on a container. */
+    fun load(pulled: Boolean = false) {
+        viewModelScope.launch {
+            val owner = ApiCache.ownerOf(container.tokenStore.current())
+            if (owner == null) {
+                shownFor = null
+                state.value = ContainersUiState(loading = false)
+                return@launch
+            }
+            if (owner != shownFor) state.value = ContainersUiState()
+            fetch(owner, pulled)
+        }
+    }
+
+    private suspend fun fetch(owner: String, pulled: Boolean) {
+        val s = state.value
+        state.value = s.copy(
+            loading = s.held.isEmpty() && s.history.isEmpty(),
+            refreshing = pulled,
+            error = null,
+        )
+        apiCall { container.api.containers() }
+            .onSuccess { res ->
+                val rewardRoundActive = if (res.held.any { it.source == "lucky_draw_reward" }) {
+                    apiCall { container.api.luckyDrawStatus() }.getOrNull()?.let { it.enrollment != null }
+                } else false
+                val snapshot = ContainersSnapshot(res.held, res.history, res.swappable, rewardRoundActive)
+                show(snapshot, owner, System.currentTimeMillis())
+                container.cache.write(ApiCache.CONTAINERS, ContainersSnapshot.serializer(), snapshot, owner)
+            }
+            .onFailure { e ->
+                // A failed refresh keeps the saved list up; the error page is only for
+                // when there's nothing to show.
+                val shown = state.value.held.isNotEmpty() || state.value.history.isNotEmpty()
+                state.value = state.value.copy(
+                    loading = false,
+                    refreshing = false,
+                    error = e.message.takeUnless { shown },
+                )
+            }
+    }
+
+    private fun show(snapshot: ContainersSnapshot, owner: String, savedAt: Long) {
+        shownFor = owner
+        shownSavedAt = savedAt
+        state.value = state.value.copy(
+            loading = false,
+            refreshing = false,
+            error = null,
+            held = snapshot.held,
+            history = snapshot.history,
+            swappable = snapshot.swappable,
+            rewardRoundActive = snapshot.rewardRoundActive,
+        )
     }
 
     private fun runAction(successMessage: String, block: suspend () -> Unit) {

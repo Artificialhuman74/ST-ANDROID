@@ -43,13 +43,23 @@ class OrderDetailViewModel(
     init {
         load()
         // Live while the screen is open: every 10 s while someone is on the move with it,
-        // every 30 s before that, and not at all once it's delivered or cancelled.
+        // every 30 s before that, and not at all once it's delivered or cancelled. Nothing while
+        // it isn't on screen (the app in the background, another screen on top).
         viewModelScope.launch {
             while (isActive) {
                 delay(if (state.value.tracking?.delivery_partner?.live != null) 10_000 else 30_000)
-                if (!finished()) refresh()
+                if (onScreen && !finished()) refresh()
             }
         }
+    }
+
+    private var onScreen = true
+
+    /** The screen came back or went away; coming back catches up straight away. */
+    fun setOnScreen(visible: Boolean) {
+        val returning = visible && !onScreen
+        onScreen = visible
+        if (returning && !finished()) viewModelScope.launch { refresh() }
     }
 
     fun load() {

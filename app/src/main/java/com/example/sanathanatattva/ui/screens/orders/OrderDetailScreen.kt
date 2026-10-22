@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -69,6 +70,11 @@ fun OrderDetailScreen(navController: NavController, orderId: Long) {
     val container = appContainer()
     val vm: OrderDetailViewModel = viewModel { OrderDetailViewModel(container, orderId) }
     val state by vm.state.collectAsState()
+    // Tracking checks the server only while this screen is in front.
+    LifecycleResumeEffect(vm) {
+        vm.setOnScreen(true)
+        onPauseOrDispose { vm.setOnScreen(false) }
+    }
     val callEvent by vm.callEvents.collectAsState()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }

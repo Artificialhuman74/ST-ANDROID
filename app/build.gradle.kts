@@ -30,8 +30,8 @@ android {
         applicationId = "com.sanathanatattva.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 10
-        versionName = "7.3"
+        versionCode = 11
+        versionName = "7.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -5,6 +5,8 @@ import com.example.sanathanatattva.data.auth.TokenStore
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Cache
+import java.io.File
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -22,13 +24,19 @@ object ApiClient {
         explicitNulls = false
     }
 
-    fun create(tokenStore: TokenStore): Retrofit {
+    /**
+     * [cacheDir]: a 20 MB HTTP cache. The server marks what may be kept (the product list, photos
+     * forever) and sends a tag with every answer, so a repeat request is answered "unchanged" with
+     * no body instead of the whole thing again.
+     */
+    fun create(tokenStore: TokenStore, cacheDir: File): Retrofit {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC
             else HttpLoggingInterceptor.Level.NONE
         }
 
         val builder = OkHttpClient.Builder()
+            .cache(Cache(File(cacheDir, "http"), 20L * 1024 * 1024))
             .addInterceptor { chain ->
                 val token = runBlocking { tokenStore.current() }
                 val request = if (token != null) {

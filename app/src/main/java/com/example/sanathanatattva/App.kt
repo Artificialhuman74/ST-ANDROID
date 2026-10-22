@@ -13,7 +13,6 @@ import com.example.sanathanatattva.data.auth.TokenStore
 import com.example.sanathanatattva.data.cache.ApiCache
 import com.example.sanathanatattva.data.cart.CartStore
 import com.example.sanathanatattva.data.prefs.ContainerPrefsStore
-import org.maplibre.android.MapLibre
 
 /** Manual DI: one container for the whole app. */
 class AppContainer(app: Application) {
@@ -22,7 +21,7 @@ class AppContainer(app: Application) {
     val containerPrefs = ContainerPrefsStore(app)
     val luckyDrawPrefs = com.example.sanathanatattva.data.prefs.LuckyDrawPrefsStore(app)
     val cache = ApiCache(app)
-    val api: ApiService = ApiClient.create(tokenStore).create(ApiService::class.java)
+    val api: ApiService = ApiClient.create(tokenStore, app.cacheDir).create(ApiService::class.java)
 }
 
 class App : Application(), ImageLoaderFactory {
@@ -32,8 +31,7 @@ class App : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        // The live order map (OpenStreetMap tiles, no API key).
-        MapLibre.getInstance(this)
+        // The map library starts with the live order map (TrackingMap), not with every launch.
     }
 
     // Coil builds its own OkHttp client by default, which rejects the dev

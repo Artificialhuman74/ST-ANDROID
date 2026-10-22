@@ -1,6 +1,7 @@
 package com.example.sanathanatattva.ui.screens.orders
 
 import android.graphics.PointF
+import org.maplibre.android.MapLibre
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -150,6 +151,8 @@ private fun LiveMapView(start: LatLng, onReady: (MapLibreMap) -> Unit, modifier:
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val mapView = remember {
+        // Started here rather than at app launch: only this screen shows a map. Safe to repeat.
+        MapLibre.getInstance(context.applicationContext)
         MapView(context).apply {
             onCreate(null)
             getMapAsync { map ->

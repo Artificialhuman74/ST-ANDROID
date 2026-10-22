@@ -370,6 +370,8 @@ private fun RefundDialog(
                     "A bank refund is arranged manually and can take a few days."
             )
         },
+        // All three stacked in one slot: the dialog lays its confirm and dismiss slots out side by
+        // side, so a separate Cancel landed on top of the full-width refund buttons.
         confirmButton = {
             Column {
                 Button(onClick = { onConfirm("store_credit") }, modifier = Modifier.fillMaxWidth()) {
@@ -379,10 +381,8 @@ private fun RefundDialog(
                 if (holding.source != "lucky_draw_reward") OutlinedButton(onClick = { onConfirm("manual_bank") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Refund to my bank")
                 }
+                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("Cancel") }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 }
